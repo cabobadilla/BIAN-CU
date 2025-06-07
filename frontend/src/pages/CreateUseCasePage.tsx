@@ -35,10 +35,10 @@ const CreateUseCasePage: React.FC = () => {
     mutationFn: (data: FormData) => useCaseService.create(data),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['useCases'] });
-      const useCaseId = response.data.data._id;
+      const useCaseId = (response.data.data as { _id: string })._id;
       navigate(`/use-cases/${useCaseId}`);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error creating use case:', error);
     },
   });

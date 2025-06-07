@@ -41,14 +41,14 @@ export interface BianApi {
   operationType: 'CR' | 'UP' | 'RQ' | 'BQ';
   endpoint: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  requestSchema?: any;
-  responseSchema?: any;
+  requestSchema?: Record<string, unknown>;
+  responseSchema?: Record<string, unknown>;
 }
 
 export interface CustomSchema {
   name: string;
   description: string;
-  schema: any;
+  schema: Record<string, unknown>;
   generatedBy: 'ai' | 'manual';
   createdAt: string;
 }
@@ -60,7 +60,7 @@ export interface DataSource {
     apiUrl?: string;
     method?: string;
     headers?: Record<string, string>;
-    payload?: any;
+    payload?: Record<string, unknown>;
     databaseUrl?: string;
     filePath?: string;
   };

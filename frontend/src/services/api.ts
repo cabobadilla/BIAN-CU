@@ -43,7 +43,7 @@ api.interceptors.response.use(
 );
 
 // Tipos para las respuestas de la API
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data: T;
   message?: string;
@@ -60,108 +60,108 @@ export interface ApiError {
 
 // Servicios de autenticación
 export const authService = {
-  getMe: () => api.get<ApiResponse<any>>('/auth/me'),
-  logout: () => api.post<ApiResponse<any>>('/auth/logout'),
+  getMe: () => api.get<ApiResponse<unknown>>('/auth/me'),
+  logout: () => api.post<ApiResponse<unknown>>('/auth/logout'),
   refreshToken: () => api.post<ApiResponse<{ token: string; expiresIn: string }>>('/auth/refresh'),
 };
 
 // Servicios de casos de uso
 export const useCaseService = {
   getAll: (status?: string) => 
-    api.get<ApiResponse<any[]>>('/use-cases', { params: { status } }),
+    api.get<ApiResponse<unknown[]>>('/use-cases', { params: { status } }),
   
   getById: (id: string) => 
-    api.get<ApiResponse<any>>(`/use-cases/${id}`),
+    api.get<ApiResponse<unknown>>(`/use-cases/${id}`),
   
   create: (data: { title: string; description: string; originalText: string }) =>
-    api.post<ApiResponse<any>>('/use-cases', data),
+    api.post<ApiResponse<unknown>>('/use-cases', data),
   
-  update: (id: string, data: Partial<any>) =>
-    api.put<ApiResponse<any>>(`/use-cases/${id}`, data),
+  update: (id: string, data: Partial<Record<string, unknown>>) =>
+    api.put<ApiResponse<unknown>>(`/use-cases/${id}`, data),
   
   delete: (id: string) =>
-    api.delete<ApiResponse<any>>(`/use-cases/${id}`),
+    api.delete<ApiResponse<unknown>>(`/use-cases/${id}`),
   
   selectDomains: (id: string, domains: string[]) =>
-    api.post<ApiResponse<any>>(`/use-cases/${id}/domains`, { domains }),
+    api.post<ApiResponse<unknown>>(`/use-cases/${id}/domains`, { domains }),
   
   selectApis: (id: string, apis: string[]) =>
-    api.post<ApiResponse<any>>(`/use-cases/${id}/apis`, { apis }),
+    api.post<ApiResponse<unknown>>(`/use-cases/${id}/apis`, { apis }),
 };
 
 // Servicios de dominios BIAN
 export const bianService = {
   getDomains: (search?: string) =>
-    api.get<ApiResponse<any[]>>('/bian/domains', { params: { search } }),
+    api.get<ApiResponse<unknown[]>>('/bian/domains', { params: { search } }),
   
   getDomainByName: (name: string) =>
-    api.get<ApiResponse<any>>(`/bian/domains/${name}`),
+    api.get<ApiResponse<unknown>>(`/bian/domains/${name}`),
   
   getApisForDomains: (domains: string[], useCaseContext?: string) =>
-    api.post<ApiResponse<{ domains: string[]; suggestedApis: any[]; count: number }>>('/bian/apis', {
+    api.post<ApiResponse<{ domains: string[]; suggestedApis: unknown[]; count: number }>>('/bian/apis', {
       domains,
       useCaseContext,
     }),
   
   getApiDetails: (apiName: string) =>
-    api.get<ApiResponse<any>>(`/bian/apis/${apiName}`),
+    api.get<ApiResponse<unknown>>(`/bian/apis/${apiName}`),
   
   validateDomains: (domains: string[], useCaseText: string) =>
-    api.post<ApiResponse<any>>('/bian/validate-domains', { domains, useCaseText }),
+    api.post<ApiResponse<unknown>>('/bian/validate-domains', { domains, useCaseText }),
 };
 
 // Servicios de schemas personalizados
 export const schemaService = {
   generate: (description: string, apiContext?: string) =>
-    api.post<ApiResponse<any>>('/schemas/generate', { description, apiContext }),
+    api.post<ApiResponse<unknown>>('/schemas/generate', { description, apiContext }),
   
-  addToUseCase: (useCaseId: string, schema: any) =>
-    api.post<ApiResponse<any>>(`/schemas/use-case/${useCaseId}`, schema),
+  addToUseCase: (useCaseId: string, schema: Record<string, unknown>) =>
+    api.post<ApiResponse<unknown>>(`/schemas/use-case/${useCaseId}`, schema),
   
   getFromUseCase: (useCaseId: string) =>
-    api.get<ApiResponse<any[]>>(`/schemas/use-case/${useCaseId}`),
+    api.get<ApiResponse<unknown[]>>(`/schemas/use-case/${useCaseId}`),
   
-  update: (useCaseId: string, schemaIndex: number, data: any) =>
-    api.put<ApiResponse<any>>(`/schemas/use-case/${useCaseId}/${schemaIndex}`, data),
+  update: (useCaseId: string, schemaIndex: number, data: Record<string, unknown>) =>
+    api.put<ApiResponse<unknown>>(`/schemas/use-case/${useCaseId}/${schemaIndex}`, data),
   
   delete: (useCaseId: string, schemaIndex: number) =>
-    api.delete<ApiResponse<any>>(`/schemas/use-case/${useCaseId}/${schemaIndex}`),
+    api.delete<ApiResponse<unknown>>(`/schemas/use-case/${useCaseId}/${schemaIndex}`),
 };
 
 // Servicios de fuentes de datos
 export const dataSourceService = {
-  addToUseCase: (useCaseId: string, dataSource: any) =>
-    api.post<ApiResponse<any>>(`/data-sources/use-case/${useCaseId}`, dataSource),
+  addToUseCase: (useCaseId: string, dataSource: Record<string, unknown>) =>
+    api.post<ApiResponse<unknown>>(`/data-sources/use-case/${useCaseId}`, dataSource),
   
   getFromUseCase: (useCaseId: string) =>
-    api.get<ApiResponse<any[]>>(`/data-sources/use-case/${useCaseId}`),
+    api.get<ApiResponse<unknown[]>>(`/data-sources/use-case/${useCaseId}`),
   
-  update: (useCaseId: string, dataSourceIndex: number, data: any) =>
-    api.put<ApiResponse<any>>(`/data-sources/use-case/${useCaseId}/${dataSourceIndex}`, data),
+  update: (useCaseId: string, dataSourceIndex: number, data: Record<string, unknown>) =>
+    api.put<ApiResponse<unknown>>(`/data-sources/use-case/${useCaseId}/${dataSourceIndex}`, data),
   
   delete: (useCaseId: string, dataSourceIndex: number) =>
-    api.delete<ApiResponse<any>>(`/data-sources/use-case/${useCaseId}/${dataSourceIndex}`),
+    api.delete<ApiResponse<unknown>>(`/data-sources/use-case/${useCaseId}/${dataSourceIndex}`),
   
-  validateConnection: (connection: { apiUrl: string; method: string; payload?: any; headers?: any }) =>
-    api.post<ApiResponse<any>>('/data-sources/validate-connection', connection),
+  validateConnection: (connection: { apiUrl: string; method: string; payload?: Record<string, unknown>; headers?: Record<string, string> }) =>
+    api.post<ApiResponse<unknown>>('/data-sources/validate-connection', connection),
 };
 
 // Servicios de empresa
 export const companyService = {
   getCurrent: () =>
-    api.get<ApiResponse<any>>('/companies/current'),
+    api.get<ApiResponse<unknown>>('/companies/current'),
   
-  updateCurrent: (data: any) =>
-    api.put<ApiResponse<any>>('/companies/current', data),
+  updateCurrent: (data: Record<string, unknown>) =>
+    api.put<ApiResponse<unknown>>('/companies/current', data),
   
   getUsers: () =>
-    api.get<ApiResponse<any[]>>('/companies/current/users'),
+    api.get<ApiResponse<unknown[]>>('/companies/current/users'),
   
   updateUserRole: (userId: string, role: 'admin' | 'user') =>
-    api.put<ApiResponse<any>>(`/companies/current/users/${userId}/role`, { role }),
+    api.put<ApiResponse<unknown>>(`/companies/current/users/${userId}/role`, { role }),
   
   updateUserStatus: (userId: string, isActive: boolean) =>
-    api.put<ApiResponse<any>>(`/companies/current/users/${userId}/status`, { isActive }),
+    api.put<ApiResponse<unknown>>(`/companies/current/users/${userId}/status`, { isActive }),
 };
 
 export default api; 
