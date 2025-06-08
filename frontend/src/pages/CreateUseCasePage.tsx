@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Save, FileText, Plus, Trash2, Users, Target, CheckSquare, GitBranch, Shield, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import { useCaseService } from '../services/api';
+import { ArrowLeft, Sparkles, Save, FileText, Plus, Trash2, Users, Target, CheckSquare, GitBranch, Shield, Clock, CheckCircle, XCircle, AlertCircle, Database, Search } from 'lucide-react';
+import { useCaseService, dataSourceService } from '../services/api';
 
 interface FlowStep {
   step: number;
@@ -17,6 +17,13 @@ interface AlternativeFlow {
   steps: FlowStep[];
 }
 
+interface DataSource {
+  _id: string;
+  name: string;
+  description: string;
+  type: 'REST_API' | 'DATABASE' | 'FILE' | 'SOAP' | 'GRAPHQL';
+}
+
 const CreateUseCasePage: React.FC = () => {
   const navigate = useNavigate();
   
@@ -29,6 +36,12 @@ const CreateUseCasePage: React.FC = () => {
   const [primaryActors, setPrimaryActors] = useState<string[]>(['']);
   const [secondaryActors, setSecondaryActors] = useState<string[]>(['']);
   const [systemActors, setSystemActors] = useState<string[]>(['']);
+  
+  // Estados para sistemas de origen
+  const [selectedDataSources, setSelectedDataSources] = useState<string[]>([]);
+  const [showDataSourceSelector, setShowDataSourceSelector] = useState(false);
+  const [newSystemName, setNewSystemName] = useState('');
+  const [showNewSystemModal, setShowNewSystemModal] = useState(false);
   
   // Flujos
   const [prerequisites, setPrerequisites] = useState<string[]>(['']);
@@ -64,6 +77,24 @@ const CreateUseCasePage: React.FC = () => {
   const [contentSuggestions, setContentSuggestions] = useState<any>(null);
   const [isGettingContentSuggestions, setIsGettingContentSuggestions] = useState(false);
 
+  // Obtener sistemas de origen existentes
+  const { data: dataSources } = useQuery({
+    queryKey: ['dataSources'],
+    queryFn: () => dataSourceService.getAll(),
+  });
+
+  // Mutation para crear nuevo sistema de origen
+  const createDataSourceMutation = useMutation({
+    mutationFn: dataSourceService.create,
+    onSuccess: (response) => {
+      const newDataSource = (response.data as any).data;
+      setSelectedDataSources(prev => [...prev, newDataSource._id]);
+      setSystemActors(prev => [...prev.filter(s => s.trim()), newDataSource.name, '']);
+      setShowNewSystemModal(false);
+      setNewSystemName('');
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: useCaseService.create,
     onSuccess: (response) => {
@@ -98,6 +129,55 @@ const CreateUseCasePage: React.FC = () => {
     const newArray = [...array];
     newArray[index] = value;
     setArray(newArray);
+  };
+
+  // Funciones para manejar sistemas de origen
+  const handleSelectDataSource = (dataSourceId: string) => {
+    const dataSource = (dataSources?.data?.data as DataSource[])?.find(ds => ds._id === dataSourceId);
+    if (dataSource && !selectedDataSources.includes(dataSourceId)) {
+      setSelectedDataSources(prev => [...prev, dataSourceId]);
+      setSystemActors(prev => [...prev.filter(s => s.trim()), dataSource.name, '']);
+    }
+    setShowDataSourceSelector(false);
+  };
+
+  const handleRemoveDataSource = (dataSourceId: string) => {
+    const dataSource = (dataSources?.data?.data as DataSource[])?.find(ds => ds._id === dataSourceId);
+    if (dataSource) {
+      setSelectedDataSources(prev => prev.filter(id => id !== dataSourceId));
+      setSystemActors(prev => prev.filter(s => s !== dataSource.name));
+    }
+  };
+
+  const handleCreateNewSystem = () => {
+    if (!newSystemName.trim()) {
+      alert('Por favor ingresa un nombre para el sistema');
+      return;
+    }
+
+    const newDataSource = {
+      name: newSystemName.trim(),
+      description: `Sistema creado desde caso de uso: ${title || 'Sin título'}`,
+      type: 'REST_API' as const,
+      connectionConfig: {
+        apiUrl: 'https://api.example.com',
+        method: 'GET',
+        headers: {},
+        authentication: {
+          type: 'none' as const
+        }
+      }
+    };
+
+    createDataSourceMutation.mutate(newDataSource);
+  };
+
+  const getSelectedDataSourcesNames = () => {
+    if (!dataSources?.data?.data) return [];
+    return selectedDataSources.map(id => {
+      const dataSource = (dataSources.data.data as DataSource[]).find(ds => ds._id === id);
+      return dataSource?.name || '';
+    }).filter(Boolean);
   };
 
   // Funciones para manejar flujo principal
@@ -538,11 +618,42 @@ ${availability ? `DISPONIBILIDAD: ${availability}` : ''}
                 </button>
               </div>
 
-              {/* Sistemas */}
+              {/* Sistemas Involucrados con selector */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Database className="inline h-4 w-4 mr-1" />
                   Sistemas Involucrados
                 </label>
+                
+                {/* Sistemas seleccionados del maestro */}
+                {selectedDataSources.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-600 mb-2">Sistemas del maestro:</p>
+                    <div className="space-y-2">
+                      {selectedDataSources.map((dataSourceId) => {
+                        const dataSource = (dataSources?.data?.data as DataSource[])?.find(ds => ds._id === dataSourceId);
+                        return dataSource ? (
+                          <div key={dataSourceId} className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-md p-2">
+                            <div className="flex items-center">
+                              <Database className="h-4 w-4 text-blue-600 mr-2" />
+                              <span className="text-sm font-medium text-blue-900">{dataSource.name}</span>
+                              <span className="text-xs text-blue-600 ml-2">({dataSource.type})</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDataSource(dataSourceId)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sistemas adicionales (texto libre) */}
                 {systemActors.map((system, index) => (
                   <div key={index} className="flex mb-2">
                     <input
@@ -563,14 +674,34 @@ ${availability ? `DISPONIBILIDAD: ${availability}` : ''}
                     )}
                   </div>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => addToArray(systemActors, setSystemActors)}
-                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Agregar sistema
-                </button>
+
+                {/* Botones de acción */}
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowDataSourceSelector(true)}
+                    className="inline-flex items-center px-3 py-1 border border-blue-300 rounded-md text-sm text-blue-700 bg-blue-50 hover:bg-blue-100"
+                  >
+                    <Search className="h-4 w-4 mr-1" />
+                    Seleccionar del maestro
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewSystemModal(true)}
+                    className="inline-flex items-center px-3 py-1 border border-green-300 rounded-md text-sm text-green-700 bg-green-50 hover:bg-green-100"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Crear nuevo sistema
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addToArray(systemActors, setSystemActors)}
+                    className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Agregar manual
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1245,6 +1376,153 @@ ${availability ? `DISPONIBILIDAD: ${availability}` : ''}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Aplicar Sugerencias
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Selector de Sistemas de Origen */}
+        {showDataSourceSelector && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[70vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    <Database className="inline h-5 w-5 mr-2" />
+                    Seleccionar Sistema de Origen
+                  </h3>
+                  <button
+                    onClick={() => setShowDataSourceSelector(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <XCircle className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {dataSources?.data?.data && (dataSources.data.data as DataSource[]).length > 0 ? (
+                    (dataSources.data.data as DataSource[])
+                      .filter(ds => !selectedDataSources.includes(ds._id))
+                      .map((dataSource) => (
+                        <div
+                          key={dataSource._id}
+                          onClick={() => handleSelectDataSource(dataSource._id)}
+                          className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium text-gray-900">{dataSource.name}</h4>
+                              <p className="text-sm text-gray-600">{dataSource.description}</p>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mt-2">
+                                {dataSource.type}
+                              </span>
+                            </div>
+                            <Plus className="h-5 w-5 text-blue-600" />
+                          </div>
+                        </div>
+                      ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <Database className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-500">No hay sistemas de origen disponibles.</p>
+                      <button
+                        onClick={() => {
+                          setShowDataSourceSelector(false);
+                          setShowNewSystemModal(true);
+                        }}
+                        className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        Crear el primer sistema
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end mt-6 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowDataSourceSelector(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Crear Nuevo Sistema */}
+        {showNewSystemModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-md w-full">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    <Plus className="inline h-5 w-5 mr-2" />
+                    Crear Nuevo Sistema
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowNewSystemModal(false);
+                      setNewSystemName('');
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <XCircle className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nombre del Sistema
+                    </label>
+                    <input
+                      type="text"
+                      value={newSystemName}
+                      onChange={(e) => setNewSystemName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ej: Core Banking, CRM, Sistema de Pagos"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="bg-blue-50 p-3 rounded-md">
+                    <p className="text-sm text-blue-800">
+                      <AlertCircle className="inline h-4 w-4 mr-1" />
+                      Se creará un sistema básico que podrás editar después en el maestro de "Sistemas de Origen".
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      setShowNewSystemModal(false);
+                      setNewSystemName('');
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleCreateNewSystem}
+                    disabled={!newSystemName.trim() || createDataSourceMutation.isPending}
+                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  >
+                    {createDataSourceMutation.isPending ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></div>
+                        Creando...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Crear Sistema
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
