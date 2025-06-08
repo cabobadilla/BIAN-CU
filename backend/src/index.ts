@@ -21,6 +21,8 @@ import { useCaseRoutes } from './routes/useCases';
 import { bianRoutes } from './routes/bian';
 import { schemaRoutes } from './routes/schemas';
 import { dataSourceRoutes } from './routes/dataSources';
+import { apiCustomizationRoutes } from './routes/apiCustomizations';
+import { singleApiRoutes } from './routes/singleApiRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -103,6 +105,8 @@ app.use('/api/v1/use-cases', useCaseRoutes);
 app.use('/api/v1/bian', bianRoutes);
 app.use('/api/v1/schemas', schemaRoutes);
 app.use('/api/v1/data-sources', dataSourceRoutes);
+app.use('/api/v1/api-customizations', apiCustomizationRoutes);
+app.use('/api/v1/single-api', singleApiRoutes);
 
 // Ruta de health check
 app.get('/health', (req, res) => {

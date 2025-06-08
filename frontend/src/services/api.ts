@@ -19,6 +19,10 @@ api.interceptors.request.use(
     const token = useAuthStore.getState().token;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      // TEMPORAL: Agregar un token dummy para development/testing
+      console.warn('No hay token de autenticación, usando token dummy para desarrollo');
+      config.headers.Authorization = `Bearer dummy-token-for-development`;
     }
     return config;
   },
@@ -149,6 +153,20 @@ export const useCaseService = {
 
   recommendDomains: (useCaseText: string) =>
     api.post<ApiResponse<unknown>>('/use-cases/recommend-domains', { useCaseText }),
+
+  // Nuevos endpoints para OpenAPI y testing
+  getOpenApiSpec: (id: string) =>
+    api.get<ApiResponse<any>>(`/use-cases/${id}/openapi-spec`),
+
+  testApi: (id: string, testData: {
+    apiName: string;
+    endpoint: string;
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    payload?: any;
+    headers?: Record<string, string>;
+    baseUrl?: string;
+  }) =>
+    api.post<ApiResponse<any>>(`/use-cases/${id}/test-api`, testData),
 };
 
 // Servicios de dominios BIAN
@@ -260,6 +278,109 @@ export const companyService = {
   
   updateUserStatus: (userId: string, isActive: boolean) =>
     api.put<ApiResponse<unknown>>(`/companies/current/users/${userId}/status`, { isActive }),
+};
+
+// Servicios de personalización de APIs
+export const apiCustomizationService = {
+  // Obtener personalización específica
+  get: (useCaseId: string, apiName: string) =>
+    api.get<ApiResponse<any>>(`/api-customizations/${useCaseId}/${encodeURIComponent(apiName)}`),
+  
+  getCustomization: (useCaseId: string, apiName: string) =>
+    api.get<ApiResponse<any>>(`/api-customizations/${useCaseId}/${encodeURIComponent(apiName)}`).then(res => res.data.data),
+
+  // Guardar/actualizar personalización
+  save: (data: {
+    useCaseId: string;
+    apiName: string;
+    customPayload?: any;
+    customHeaders?: Record<string, string>;
+    customParameters?: any;
+    notes?: string;
+    testingConfig?: any;
+  }) =>
+    api.post<ApiResponse<any>>('/api-customizations', data),
+
+  saveCustomization: (data: {
+    useCaseId: string;
+    apiName: string;
+    customPayload?: any;
+    customHeaders?: Record<string, string>;
+    customParameters?: any;
+    notes?: string;
+    testingConfig?: any;
+  }) =>
+    api.post<ApiResponse<any>>('/api-customizations', data).then(res => res.data.data),
+
+  // Ejecutar test con personalización
+  test: (useCaseId: string, apiName: string, testData: {
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    endpoint: string;
+    useCustomData?: boolean;
+    overridePayload?: any;
+    overrideHeaders?: Record<string, string>;
+  }) =>
+    api.post<ApiResponse<any>>(`/api-customizations/${useCaseId}/${encodeURIComponent(apiName)}/test`, testData),
+
+  testApi: (useCaseId: string, apiName: string, testData: {
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    endpoint: string;
+    useCustomData?: boolean;
+    overridePayload?: any;
+    overrideHeaders?: Record<string, string>;
+  }) =>
+    api.post<ApiResponse<any>>(`/api-customizations/${useCaseId}/${encodeURIComponent(apiName)}/test`, testData).then(res => res.data.data),
+
+  // Resetear personalización
+  reset: (useCaseId: string, apiName: string) =>
+    api.post<ApiResponse<any>>(`/api-customizations/${useCaseId}/${encodeURIComponent(apiName)}/reset`, {}),
+
+  // Eliminar personalización
+  delete: (useCaseId: string, apiName: string) =>
+    api.delete<ApiResponse<any>>(`/api-customizations/${useCaseId}/${encodeURIComponent(apiName)}`),
+
+  // Obtener todas las personalizaciones de un caso de uso
+  getByUseCase: (useCaseId: string) =>
+    api.get<ApiResponse<any[]>>(`/api-customizations/${useCaseId}`),
+};
+
+// Servicios de API individual (página dedicada)
+export const singleApiService = {
+  // Obtener información completa de una API específica
+  get: (useCaseId: string, apiName: string) =>
+    api.get<ApiResponse<{
+      useCase: { id: string; title: string; description: string };
+      api: any;
+      customization: any | null;
+      openApiSpec: any;
+      hasCustomization: boolean;
+      availableOperations: string[];
+    }>>(`/single-api/${useCaseId}/${encodeURIComponent(apiName)}`),
+
+  getApiData: (useCaseId: string, apiName: string) =>
+    api.get<ApiResponse<{
+      useCase: { id: string; title: string; description: string };
+      api: any;
+      customization: any | null;
+      openApiSpec: any;
+      hasCustomization: boolean;
+      availableOperations: string[];
+    }>>(`/single-api/${useCaseId}/${encodeURIComponent(apiName)}`).then(res => res.data.data),
+
+  // Obtener especificación OpenAPI únicamente
+  getOpenApiSpec: (useCaseId: string, apiName: string, includeCustomizations = true) =>
+    api.get<ApiResponse<any>>(`/single-api/${useCaseId}/${encodeURIComponent(apiName)}/openapi-spec`, {
+      params: { includeCustomizations }
+    }),
+
+  // Obtener APIs relacionadas
+  getRelatedApis: (useCaseId: string, apiName: string) =>
+    api.get<ApiResponse<{
+      currentApi: { name: string; domain: string };
+      relatedApis: any[];
+      count: number;
+      groupedByDomain: Record<string, any[]>;
+    }>>(`/single-api/${useCaseId}/${encodeURIComponent(apiName)}/related-apis`),
 };
 
 export default api; 

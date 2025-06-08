@@ -9,15 +9,16 @@ import {
   Sparkles, 
   Building2, 
   Code, 
-  Database, 
-  Plus,
   Trash2,
   CheckCircle,
   AlertCircle,
   FileText,
-  Settings,
-  MoreVertical
+  MoreVertical,
+  BookOpen
 } from 'lucide-react';
+import SwaggerUI from 'swagger-ui-react';
+import 'swagger-ui-react/swagger-ui.css';
+import '../styles/swagger-custom.css';
 import { useCaseService, bianService } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import type { UseCase, BianDomain, BianApi } from '../types';
@@ -27,7 +28,7 @@ const UseCasePage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'domains' | 'apis'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'domains' | 'apis' | 'documentation'>('overview');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ title: '', description: '' });
   const [showDropdown, setShowDropdown] = useState(false);
@@ -91,17 +92,48 @@ const UseCasePage: React.FC = () => {
   });
 
   const deleteUseCaseMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       console.log('Ejecutando eliminación para ID:', id);
-      return useCaseService.delete(id!);
+      console.log('URL que se va a llamar:', `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/v1/use-cases/${id}`);
+      
+      try {
+        const response = await useCaseService.delete(id!);
+        console.log('Respuesta del servidor:', response);
+        return response;
+      } catch (error: any) {
+        console.error('Error detallado en la eliminación:', {
+          message: error.message,
+          response: error.response,
+          status: error.response?.status,
+          data: error.response?.data,
+          config: error.config
+        });
+        throw error;
+      }
     },
-    onSuccess: () => {
-      console.log('Caso de uso eliminado exitosamente');
+    onSuccess: (response) => {
+      console.log('Caso de uso eliminado exitosamente:', response);
+      alert('Caso de uso eliminado exitosamente');
       navigate('/dashboard');
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error eliminando caso de uso:', error);
-      alert('Error al eliminar el caso de uso. Por favor intenta de nuevo.');
+      
+      let errorMessage = 'Error al eliminar el caso de uso. ';
+      
+      if (error.code === 'ERR_NETWORK') {
+        errorMessage += 'Problema de conexión con el servidor. Verifica que el backend esté ejecutándose.';
+      } else if (error.response?.status === 401) {
+        errorMessage += 'No tienes autorización para realizar esta acción.';
+      } else if (error.response?.status === 404) {
+        errorMessage += 'El caso de uso no fue encontrado.';
+      } else if (error.response?.status >= 500) {
+        errorMessage += 'Error interno del servidor.';
+      } else {
+        errorMessage += `Error: ${error.message}`;
+      }
+      
+      alert(errorMessage);
     },
   });
 
@@ -189,7 +221,8 @@ const UseCasePage: React.FC = () => {
   const tabs = [
     { id: 'overview', label: 'Resumen', icon: FileText },
     { id: 'domains', label: 'Dominios BIAN', icon: Building2 },
-    { id: 'apis', label: 'APIs', icon: Code },
+    { id: 'apis', label: 'APIs Semánticas Escogidas', icon: Code },
+    { id: 'documentation', label: 'Documentación de APIs', icon: BookOpen },
   ];
 
   return (
@@ -300,7 +333,7 @@ const UseCasePage: React.FC = () => {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as 'overview' | 'domains' | 'apis')}
+                onClick={() => setActiveTab(tab.id as 'overview' | 'domains' | 'apis' | 'documentation')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'
@@ -332,6 +365,9 @@ const UseCasePage: React.FC = () => {
             onSelectApis={(apis) => selectApisMutation.mutate(apis)}
             isLoading={selectApisMutation.isPending}
           />
+        )}
+        {activeTab === 'documentation' && (
+          <DocumentationTab useCase={useCase} />
         )}
 
       </div>
@@ -513,7 +549,7 @@ const OverviewTab: React.FC<{ useCase: UseCase }> = ({ useCase }) => {
   );
 };
 
-// Componente Domains Tab
+// Componente DomainsTab
 const DomainsTab: React.FC<{
   useCase: UseCase;
   domains: BianDomain[];
@@ -552,30 +588,6 @@ const DomainsTab: React.FC<{
         )}
       </div>
 
-      {useCase.aiAnalysis?.suggestedDomains && useCase.aiAnalysis.suggestedDomains.length > 0 && (
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h4 className="font-medium text-blue-900 mb-2 flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
-            Dominios Sugeridos por IA
-          </h4>
-          <div className="flex flex-wrap gap-2">
-            {useCase.aiAnalysis.suggestedDomains.map((domain, index) => (
-              <button
-                key={index}
-                onClick={() => handleDomainToggle(domain)}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  selectedDomains.includes(domain)
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-blue-200 text-blue-800 hover:bg-blue-300'
-                }`}
-              >
-                {domain}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {domains.map((domain) => (
           <div
@@ -588,38 +600,47 @@ const DomainsTab: React.FC<{
             onClick={() => handleDomainToggle(domain.name)}
           >
             <div className="flex items-start justify-between mb-2">
-              <h4 className="font-medium text-gray-900">{domain.name}</h4>
+              <div className="flex-1">
+                <h4 className="font-medium text-gray-900 mb-1">{domain.name}</h4>
+                <p className="text-sm text-gray-600 mb-2">{domain.description}</p>
+                <div className="text-xs text-gray-500">
+                  <span className="font-medium">Área:</span> {domain.businessArea || 'N/A'}
+                </div>
+              </div>
               {selectedDomains.includes(domain.name) && (
-                <CheckCircle className="h-5 w-5 text-blue-600" />
+                <CheckCircle className="h-5 w-5 text-blue-600 ml-2" />
               )}
-            </div>
-            <p className="text-sm text-gray-600 mb-2">{domain.description}</p>
-            <div className="text-xs text-gray-500">
-              <span className="font-medium">Área:</span> {domain.businessArea}
             </div>
           </div>
         ))}
       </div>
+
+      {domains.length === 0 && (
+        <div className="text-center py-8">
+          <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay dominios disponibles</h3>
+          <p className="text-gray-600">No se pudieron cargar los dominios BIAN.</p>
+        </div>
+      )}
     </div>
   );
 };
 
-// Componente APIs Tab
+// Componente ApisTab para selección de APIs semánticas
 const ApisTab: React.FC<{
   useCase: UseCase;
   onSelectApis: (apis: string[]) => void;
   isLoading: boolean;
 }> = ({ useCase, onSelectApis, isLoading }) => {
-  const [selectedApis, setSelectedApis] = useState<string[]>(useCase.selectedApis);
-  
-  // Consultar APIs para los dominios seleccionados
-  const { data: apisResponse, isLoading: apisLoading } = useQuery({
-    queryKey: ['bianApis', useCase.selectedDomains],
-    queryFn: () => bianService.getApisForDomains(useCase.selectedDomains, useCase.originalText),
-    enabled: useCase.selectedDomains.length > 0,
-  });
+  const [selectedApis, setSelectedApis] = useState<string[]>(useCase.selectedApis || []);
+  const [hasChanges, setHasChanges] = useState(false);
 
-  const apis: BianApi[] = (apisResponse?.data?.data as { suggestedApis: BianApi[] })?.suggestedApis || [];
+  // Verificar cambios
+  useEffect(() => {
+    const currentApis = [...(useCase.selectedApis || [])].sort();
+    const newApis = [...selectedApis].sort();
+    setHasChanges(JSON.stringify(currentApis) !== JSON.stringify(newApis));
+  }, [selectedApis, useCase.selectedApis]);
 
   const handleApiToggle = (apiName: string) => {
     setSelectedApis(prev => 
@@ -633,7 +654,14 @@ const ApisTab: React.FC<{
     onSelectApis(selectedApis);
   };
 
-  const hasChanges = JSON.stringify(selectedApis.sort()) !== JSON.stringify(useCase.selectedApis.sort());
+  // Consultar APIs para los dominios seleccionados
+  const { data: apisResponse, isLoading: apisLoading } = useQuery({
+    queryKey: ['bianApis', useCase.selectedDomains],
+    queryFn: () => bianService.getApisForDomains(useCase.selectedDomains, useCase.originalText),
+    enabled: useCase.selectedDomains.length > 0,
+  });
+
+  const apis: BianApi[] = (apisResponse?.data?.data as { suggestedApis: BianApi[] })?.suggestedApis || [];
 
   if (useCase.selectedDomains.length === 0) {
     return (
@@ -652,7 +680,12 @@ const ApisTab: React.FC<{
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-900">APIs BIAN</h3>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">APIs Semánticas Escogidas</h3>
+          <p className="text-sm text-gray-600 mt-1">
+            Selecciona las APIs BIAN que consideras usar para resolver el caso de uso
+          </p>
+        </div>
         {hasChanges && (
           <button
             onClick={handleSave}
@@ -699,9 +732,9 @@ const ApisTab: React.FC<{
                   <span className="font-medium"> Endpoint:</span> <code className="bg-gray-100 px-1 rounded">{api.endpoint}</code>
                 </div>
                 
-                {/* Mostrar métodos disponibles si hay más de uno */}
-                {api.availableMethods && api.availableMethods.length > 1 && (
-                  <div className="text-xs text-gray-500">
+                {/* Mostrar métodos disponibles */}
+                {selectedApis.includes(api.name) && api.availableMethods && api.availableMethods.length > 1 && (
+                  <div className="text-xs text-gray-500 mt-2">
                     <span className="font-medium">Métodos disponibles:</span>
                     <div className="flex gap-1 mt-1">
                       {api.availableMethods.map((method, idx) => (
@@ -719,8 +752,8 @@ const ApisTab: React.FC<{
                   </div>
                 )}
                 
-                {/* Mostrar parámetros si están disponibles */}
-                {api.parameters && api.parameters.length > 0 && (
+                {/* Mostrar parámetros */}
+                {selectedApis.includes(api.name) && api.parameters && api.parameters.length > 0 && (
                   <div className="text-xs text-gray-500 mt-2">
                     <span className="font-medium">Parámetros:</span>
                     <div className="flex flex-wrap gap-1 mt-1">
@@ -755,6 +788,695 @@ const ApisTab: React.FC<{
   );
 };
 
+// Componente DocumentationTab - Nueva pestaña para documentación de APIs con YAML específico
+const DocumentationTab: React.FC<{ useCase: UseCase }> = ({ useCase }) => {
+  const [selectedApi, setSelectedApi] = useState<string>('');
+  const [selectedMethod, setSelectedMethod] = useState<string>('');
+  const [yamlContent, setYamlContent] = useState<string>('');
+  const [isLoadingYaml, setIsLoadingYaml] = useState(false);
+  const [yamlError, setYamlError] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'yaml' | 'swagger'>('yaml');
 
+  // Obtener las APIs seleccionadas con sus detalles
+  const { data: apisResponse, isLoading: apisLoading } = useQuery({
+    queryKey: ['bianApis', useCase.selectedDomains],
+    queryFn: () => bianService.getApisForDomains(useCase.selectedDomains, useCase.originalText),
+    enabled: useCase.selectedDomains.length > 0,
+  });
+
+  const apis: BianApi[] = (apisResponse?.data?.data as { suggestedApis: BianApi[] })?.suggestedApis || [];
+  const selectedApis = apis.filter(api => useCase.selectedApis.includes(api.name));
+  const currentApiData = selectedApis.find(api => api.name === selectedApi) || selectedApis[0];
+
+  // Obtener métodos disponibles para la API seleccionada
+  const availableMethods = currentApiData?.availableMethods || [currentApiData?.method].filter(Boolean);
+
+  // Función para obtener YAML específico de BIAN
+  const fetchBianYaml = async (apiName: string, method: string) => {
+    setIsLoadingYaml(true);
+    setYamlError('');
+    setYamlContent('');
+
+    try {
+      // Simulación de llamada a BIAN - en producción esto sería una llamada real
+      // Por ahora generamos un YAML de ejemplo basado en la API y método
+      const mockYaml = generateMockBianYaml(apiName, method, currentApiData);
+      
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setYamlContent(mockYaml);
+    } catch (error) {
+      console.error('Error fetching BIAN YAML:', error);
+      setYamlError('Error al obtener la especificación YAML de BIAN');
+    } finally {
+      setIsLoadingYaml(false);
+    }
+  };
+
+  // Función para generar YAML mock realista
+  const generateMockBianYaml = (apiName: string, method: string, apiData: any) => {
+    const sanitizedApiName = apiName.replace(/\s+/g, '');
+    const endpoint = apiData?.endpoint || `/api/v1/${sanitizedApiName.toLowerCase()}`;
+    
+    return `openapi: 3.0.3
+info:
+  title: ${apiName} API
+  description: ${apiData?.description || `Documentación para ${apiName}`}
+  version: "1.0.0"
+  contact:
+    name: BIAN
+    url: https://bian.org
+    email: support@bian.org
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: https://api.bian.org/v13
+    description: Servidor BIAN v13 (Producción)
+  - url: https://sandbox.bian.org/v13
+    description: Servidor BIAN v13 (Sandbox)
+
+paths:
+  ${endpoint}:
+    ${method.toLowerCase()}:
+      tags:
+        - ${apiData?.domain || 'Customer Management'}
+      summary: ${getMethodSummary(method, apiName)}
+      description: |
+        ${getMethodDescription(method, apiName, apiData?.description)}
+        
+        **Dominio BIAN:** ${apiData?.domain || 'Customer Management'}
+        **Tipo de Operación:** ${apiData?.operationType || 'CR'}
+      operationId: ${method.toLowerCase()}${sanitizedApiName}
+      parameters:
+        - name: X-Request-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Identificador único de la solicitud
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Token de autorización Bearer
+${generateMethodSpecificParams(method, apiData)}
+      responses:
+        '200':
+          description: ${getSuccessDescription(method)}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/${sanitizedApiName}Response'
+              example:
+                ${generateResponseExample(method, apiName)}
+        '400':
+          description: Solicitud inválida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: No autorizado
+        '403':
+          description: Acceso prohibido
+        '404':
+          description: Recurso no encontrado
+        '500':
+          description: Error interno del servidor
+
+components:
+  schemas:
+    ${sanitizedApiName}Response:
+      type: object
+      properties:
+        ${generateSchemaProperties(method, apiName)}
+    
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "INVALID_REQUEST"
+            message:
+              type: string
+              example: "Los parámetros de entrada no son válidos"
+            details:
+              type: array
+              items:
+                type: string
+  
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: ${apiData?.domain || 'Customer Management'}
+    description: APIs del dominio ${apiData?.domain || 'Customer Management'}
+    externalDocs:
+      description: Documentación BIAN
+      url: https://bian.org/semantic-apis`;
+  };
+
+  const getMethodSummary = (method: string, apiName: string) => {
+    switch (method.toUpperCase()) {
+      case 'GET': return `Obtener información de ${apiName}`;
+      case 'POST': return `Crear nuevo registro en ${apiName}`;
+      case 'PUT': return `Actualizar registro en ${apiName}`;
+      case 'DELETE': return `Eliminar registro de ${apiName}`;
+      default: return `Operación ${method} en ${apiName}`;
+    }
+  };
+
+  const getMethodDescription = (method: string, apiName: string, description?: string) => {
+    const baseDesc = description || `API para gestión de ${apiName}`;
+    const methodDesc = {
+      'GET': `Recupera información detallada de ${apiName}. Esta operación permite consultar datos específicos del recurso utilizando parámetros de filtrado y búsqueda.`,
+      'POST': `Crea un nuevo registro en ${apiName}. Esta operación permite registrar nueva información con validación completa de datos de entrada.`,
+      'PUT': `Actualiza información existente en ${apiName}. Esta operación permite modificar datos completos del recurso especificado.`,
+      'DELETE': `Elimina un registro específico de ${apiName}. Esta operación requiere confirmación y maneja dependencias relacionadas.`
+    }[method.toUpperCase()] || `Ejecuta operaciones específicas en ${apiName}.`;
+    
+    return `${baseDesc}\n\n${methodDesc}`;
+  };
+
+  const generateMethodSpecificParams = (method: string, apiData: any) => {
+    let params = '';
+    
+    if (method.toUpperCase() === 'GET') {
+      params += `
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Identificador único del cliente`;
+    }
+    
+    if (['POST', 'PUT'].includes(method.toUpperCase())) {
+      params += `
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/${apiData?.name?.replace(/\s+/g, '') || 'RequestBody'}'`;
+    }
+    
+    return params;
+  };
+
+  const getSuccessDescription = (method: string) => {
+    switch (method.toUpperCase()) {
+      case 'GET': return 'Información recuperada exitosamente';
+      case 'POST': return 'Recurso creado exitosamente';
+      case 'PUT': return 'Recurso actualizado exitosamente';
+      case 'DELETE': return 'Recurso eliminado exitosamente';
+      default: return 'Operación completada exitosamente';
+    }
+  };
+
+  const generateResponseExample = (_method: string, apiName: string) => {
+    const timestamp = new Date().toISOString();
+    return `
+                requestId: "123e4567-e89b-12d3-a456-426614174000"
+                timestamp: "${timestamp}"
+                data:
+                  id: "cust-001"
+                  name: "${apiName} Response"
+                  status: "active"
+                  createdAt: "${timestamp}"`;
+  };
+
+  const generateSchemaProperties = (_method: string, apiName: string) => {
+    return `
+        requestId:
+          type: string
+          format: uuid
+          description: ID único de la solicitud
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp de la respuesta
+        data:
+          type: object
+          description: Datos de respuesta específicos de ${apiName}`;
+  };
+
+  // Convertir YAML a JSON para Swagger UI
+  const convertYamlToSwaggerSpec = () => {
+    if (!yamlContent) return null;
+    
+    try {
+      // Convertir el YAML string a un objeto JavaScript que Swagger UI pueda usar
+      // Por simplicidad, vamos a crear el objeto directamente desde los datos
+      const sanitizedApiName = currentApiData?.name?.replace(/\s+/g, '') || 'API';
+      const endpoint = currentApiData?.endpoint || `/api/v1/${sanitizedApiName.toLowerCase()}`;
+      
+      return {
+        openapi: "3.0.3",
+        info: {
+          title: `${selectedApi}`,
+          description: `${getMethodDescription(selectedMethod, selectedApi, currentApiData?.description)}\n\n**Dominio BIAN:** ${currentApiData?.domain || 'Customer Management'}\n**Tipo de Operación:** ${currentApiData?.operationType || 'CR'}`,
+          version: "1.0.0"
+        },
+        paths: {
+          [endpoint]: {
+            [selectedMethod.toLowerCase()]: {
+              tags: [currentApiData?.domain || 'Customer Management'],
+              summary: getMethodSummary(selectedMethod, selectedApi),
+              description: getMethodDescription(selectedMethod, selectedApi, currentApiData?.description),
+              operationId: `${selectedMethod.toLowerCase()}${sanitizedApiName}`,
+              parameters: [
+                {
+                  name: "X-Request-ID",
+                  in: "header",
+                  required: true,
+                  schema: {
+                    type: "string",
+                    format: "uuid"
+                  },
+                  description: "Identificador único de la solicitud"
+                },
+                {
+                  name: "Authorization",
+                  in: "header",
+                  required: true,
+                  schema: {
+                    type: "string"
+                  },
+                  description: "Token de autorización Bearer"
+                },
+                ...(selectedMethod.toUpperCase() === 'GET' ? [{
+                  name: "customerId",
+                  in: "path",
+                  required: true,
+                  schema: {
+                    type: "string"
+                  },
+                  description: "Identificador único del cliente"
+                }] : [])
+              ],
+              ...((['POST', 'PUT'].includes(selectedMethod.toUpperCase())) && {
+                requestBody: {
+                  required: true,
+                  content: {
+                    "application/json": {
+                      schema: {
+                        $ref: `#/components/schemas/${sanitizedApiName}Request`
+                      }
+                    }
+                  }
+                }
+              }),
+              responses: {
+                "200": {
+                  description: getSuccessDescription(selectedMethod),
+                  content: {
+                    "application/json": {
+                      schema: {
+                        $ref: `#/components/schemas/${sanitizedApiName}Response`
+                      },
+                      example: {
+                        requestId: "123e4567-e89b-12d3-a456-426614174000",
+                        timestamp: new Date().toISOString(),
+                        data: {
+                          id: "cust-001",
+                          name: `${selectedApi} Response`,
+                          status: "active",
+                          createdAt: new Date().toISOString()
+                        }
+                      }
+                    }
+                  }
+                },
+                "400": {
+                  description: "Solicitud inválida",
+                  content: {
+                    "application/json": {
+                      schema: {
+                        $ref: "#/components/schemas/ErrorResponse"
+                      }
+                    }
+                  }
+                },
+                "401": {
+                  description: "No autorizado"
+                },
+                "403": {
+                  description: "Acceso prohibido"
+                },
+                "404": {
+                  description: "Recurso no encontrado"
+                },
+                "500": {
+                  description: "Error interno del servidor"
+                }
+              }
+            }
+          }
+        },
+        components: {
+          schemas: {
+            [`${sanitizedApiName}Response`]: {
+              type: "object",
+              properties: {
+                requestId: {
+                  type: "string",
+                  format: "uuid",
+                  description: "ID único de la solicitud"
+                },
+                timestamp: {
+                  type: "string",
+                  format: "date-time",
+                  description: "Timestamp de la respuesta"
+                },
+                data: {
+                  type: "object",
+                  description: `Datos de respuesta específicos de ${selectedApi}`
+                }
+              }
+            },
+            [`${sanitizedApiName}Request`]: {
+              type: "object",
+              properties: {
+                customerData: {
+                  type: "object",
+                  properties: {
+                    name: {
+                      type: "string",
+                      description: "Nombre del cliente"
+                    },
+                    email: {
+                      type: "string",
+                      format: "email",
+                      description: "Email del cliente"
+                    },
+                    phone: {
+                      type: "string",
+                      description: "Teléfono del cliente"
+                    }
+                  },
+                  required: ["name", "email"]
+                }
+              }
+            },
+            ErrorResponse: {
+              type: "object",
+              properties: {
+                error: {
+                  type: "object",
+                  properties: {
+                    code: {
+                      type: "string",
+                      example: "INVALID_REQUEST"
+                    },
+                    message: {
+                      type: "string",
+                      example: "Los parámetros de entrada no son válidos"
+                    },
+                    details: {
+                      type: "array",
+                      items: {
+                        type: "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          securitySchemes: {
+            BearerAuth: {
+              type: "http",
+              scheme: "bearer",
+              bearerFormat: "JWT"
+            }
+          }
+        },
+        security: [
+          {
+            BearerAuth: []
+          }
+        ],
+        tags: [
+          {
+            name: currentApiData?.domain || 'Customer Management',
+            description: `APIs del dominio ${currentApiData?.domain || 'Customer Management'}`,
+            externalDocs: {
+              description: "Documentación BIAN",
+              url: "https://bian.org/semantic-apis"
+            }
+          }
+        ]
+      };
+    } catch (error) {
+      console.error('Error converting YAML to Swagger spec:', error);
+      return null;
+    }
+  };
+
+  // Copiar contenido al portapapeles
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(yamlContent);
+      alert('YAML copiado al portapapeles');
+    } catch (err) {
+      console.error('Error copying to clipboard:', err);
+      alert('Error al copiar al portapapeles');
+    }
+  };
+
+  // Effect para cargar YAML cuando cambia la selección
+  useEffect(() => {
+    if (selectedApi && selectedMethod) {
+      fetchBianYaml(selectedApi, selectedMethod);
+    }
+  }, [selectedApi, selectedMethod]);
+
+  // Inicializar selecciones por defecto
+  useEffect(() => {
+    if (selectedApis.length > 0 && !selectedApi) {
+      const firstApi = selectedApis[0];
+      setSelectedApi(firstApi.name);
+      const firstMethod = firstApi.availableMethods?.[0] || firstApi.method;
+      setSelectedMethod(firstMethod);
+    }
+  }, [selectedApis, selectedApi]);
+
+  if (useCase.selectedApis.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No hay APIs seleccionadas</h3>
+        <p className="text-gray-600">
+          Primero selecciona APIs en la pestaña "APIs Semánticas Escogidas" para ver su documentación.
+        </p>
+      </div>
+    );
+  }
+
+  if (apisLoading) {
+    return <LoadingSpinner />;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header con selectores */}
+      <div className="bg-white rounded-lg border p-6">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Documentación de APIs</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Especificación YAML específica desde el repositorio BIAN
+            </p>
+          </div>
+        </div>
+
+        {/* Selectores de API y Método */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Seleccionar API
+            </label>
+            <select 
+              value={selectedApi} 
+              onChange={(e) => {
+                setSelectedApi(e.target.value);
+                // Reset method selection when API changes
+                const newApiData = selectedApis.find(api => api.name === e.target.value);
+                const firstMethod = newApiData?.availableMethods?.[0] || newApiData?.method;
+                setSelectedMethod(firstMethod || '');
+              }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              {selectedApis.map((api) => (
+                <option key={api.name} value={api.name}>
+                  {api.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Seleccionar Método
+            </label>
+            <select 
+              value={selectedMethod} 
+              onChange={(e) => setSelectedMethod(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={!availableMethods || availableMethods.length === 0}
+            >
+              {availableMethods?.map((method) => (
+                <option key={method} value={method}>
+                  {method.toUpperCase()}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Información de la API seleccionada */}
+        {currentApiData && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium text-gray-900">{currentApiData.name}</h4>
+                <p className="text-sm text-gray-600 mt-1">{currentApiData.description}</p>
+                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                  <span><strong>Dominio:</strong> {currentApiData.domain}</span>
+                  <span><strong>Endpoint:</strong> {currentApiData.endpoint}</span>
+                  <span><strong>Tipo:</strong> {currentApiData.operationType}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                  {currentApiData.domain}
+                </span>
+                <span className={`text-xs px-2 py-1 rounded font-medium ${
+                  selectedMethod === 'GET' ? 'bg-green-100 text-green-800' :
+                  selectedMethod === 'POST' ? 'bg-blue-100 text-blue-800' :
+                  selectedMethod === 'PUT' ? 'bg-yellow-100 text-yellow-800' :
+                  selectedMethod === 'DELETE' ? 'bg-red-100 text-red-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {selectedMethod}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Vista Dual Vertical: Swagger arriba, YAML abajo */}
+      {selectedApi && selectedMethod && (
+        <div className="space-y-6">
+          {/* Sección Swagger UI */}
+          {yamlContent && !isLoadingYaml && !yamlError && (
+            <div className="bg-white rounded-lg border overflow-hidden">
+              <div className="bg-gray-50 px-6 py-4 border-b">
+                <div>
+                  <h4 className="font-semibold text-gray-900">
+                    Vista Swagger UI - {selectedApi} ({selectedMethod})
+                  </h4>
+                  <p className="text-sm text-gray-600">Interfaz interactiva de la especificación OpenAPI</p>
+                </div>
+              </div>
+
+              <div className="p-0">
+                <div className="swagger-container max-h-96 overflow-auto">
+                  {(() => {
+                    const swaggerSpec = convertYamlToSwaggerSpec();
+                    return swaggerSpec ? (
+                      <SwaggerUI 
+                        spec={swaggerSpec}
+                        docExpansion="list"
+                        defaultModelsExpandDepth={1}
+                        defaultModelExpandDepth={1}
+                        displayOperationId={false}
+                        displayRequestDuration={true}
+                        filter={false}
+                        showExtensions={false}
+                        showCommonExtensions={false}
+                        tryItOutEnabled={false}
+                      />
+                    ) : (
+                      <div className="p-6 text-center">
+                        <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                        <p className="text-red-600">Error al generar especificación Swagger</p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Sección YAML */}
+          <div className="bg-white rounded-lg border overflow-hidden">
+            <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+              <div>
+                <h4 className="font-semibold text-gray-900">
+                  Especificación YAML - {selectedApi} ({selectedMethod})
+                </h4>
+                <p className="text-sm text-gray-600">Obtenido del repositorio oficial BIAN</p>
+              </div>
+              <button
+                onClick={copyToClipboard}
+                disabled={!yamlContent || isLoadingYaml}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+              >
+                <span>📋</span>
+                Copiar YAML
+              </button>
+            </div>
+
+            <div className="p-0">
+              {isLoadingYaml && (
+                <div className="flex items-center justify-center py-12">
+                  <LoadingSpinner />
+                  <span className="ml-3 text-gray-600">Obteniendo especificación YAML de BIAN...</span>
+                </div>
+              )}
+
+              {yamlError && (
+                <div className="p-6 text-center">
+                  <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Error al cargar YAML</h3>
+                  <p className="text-red-600">{yamlError}</p>
+                  <button
+                    onClick={() => fetchBianYaml(selectedApi, selectedMethod)}
+                    className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              )}
+
+              {yamlContent && !isLoadingYaml && (
+                <div className="bg-gray-900 text-gray-100 max-h-80 overflow-auto">
+                  <pre className="p-6 text-sm font-mono whitespace-pre-wrap">{yamlContent}</pre>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default UseCasePage; 

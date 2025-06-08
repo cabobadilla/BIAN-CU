@@ -13,7 +13,9 @@ import SelectApisPage from './pages/SelectApisPage';
 import SchemasPage from './pages/SchemasPage';
 import DataSourcesPage from './pages/DataSourcesPage';
 import CompanyPage from './pages/CompanyPage';
+import SingleApiPage from './pages/SingleApiPage';
 import AuthCallback from './pages/AuthCallbackPage';
+
 import Layout from './components/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
 
@@ -108,6 +110,7 @@ function App() {
               <Route path="use-cases/new" element={<CreateUseCasePage />} />
               <Route path="use-cases/:id/select-domains" element={<SelectDomainsPage />} />
               <Route path="use-cases/:id/select-apis" element={<SelectApisPage />} />
+              <Route path="use-case/:useCaseId/api/:apiName" element={<SingleApiPage />} />
               <Route path="use-cases/:id" element={<UseCasePage />} />
               <Route path="schemas" element={<SchemasPage />} />
               <Route path="data-sources" element={<DataSourcesPage />} />

@@ -654,9 +654,17 @@ const SelectApisPage: React.FC = () => {
                                     <p className="text-sm text-gray-600 mb-2">{api.description}</p>
                                     <p className="text-sm text-blue-600 mb-2">{api.reason}</p>
                                     
-                                    <div className="flex items-center text-sm text-gray-500">
-                                      <Code className="h-4 w-4 mr-1" />
-                                      {api.methods.length} método{api.methods.length !== 1 ? 's' : ''} disponible{api.methods.length !== 1 ? 's' : ''}
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center text-sm text-gray-500">
+                                        <Code className="h-4 w-4 mr-1" />
+                                        {api.methods.length} método{api.methods.length !== 1 ? 's' : ''} disponible{api.methods.length !== 1 ? 's' : ''}
+                                      </div>
+                                      <button
+                                        onClick={() => navigate(`/use-case/${id}/api/${encodeURIComponent(api.name)}`)}
+                                        className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                      >
+                                        📖 Ver Documentación
+                                      </button>
                                     </div>
                                   </div>
                                 </div>

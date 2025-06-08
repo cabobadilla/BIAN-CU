@@ -51,6 +51,7 @@ export interface UseCase {
   };
   selectedDomains: string[];
   selectedApis: string[];
+  suggestedApis?: BianApi[];
   customSchemas: CustomSchema[];
   dataSources: DataSource[];
   createdAt: string;
@@ -161,4 +162,87 @@ export interface ActivityItem {
     name: string;
     picture?: string;
   };
+}
+
+// Nuevos tipos para personalización de APIs
+export interface ApiCustomization {
+  _id: string;
+  useCaseId: string;
+  apiName: string;
+  userId: string;
+  companyId: string;
+  
+  customPayload?: Record<string, any>;
+  customHeaders?: Record<string, string>;
+  customParameters?: Record<string, any>;
+  notes?: string;
+  
+  testingConfig?: {
+    baseUrl?: string;
+    timeout?: number;
+    retries?: number;
+  };
+  
+  testHistory?: ApiTestResult[];
+  
+  isActive: boolean;
+  lastModified: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiTestResult {
+  timestamp: string;
+  method: string;
+  endpoint: string;
+  status?: number;
+  responseTime?: number;
+  success: boolean;
+  errorMessage?: string;
+}
+
+export interface SingleApiPageData {
+  useCase: {
+    id: string;
+    title: string;
+    description: string;
+  };
+  api: {
+    name: string;
+    domain: string;
+    description: string;
+    endpoints: Array<{
+      path: string;
+      method: string;
+      operation: string;
+      description: string;
+    }>;
+    coverage: string[];
+    limitations: string[];
+  };
+  customization: ApiCustomization | null;
+  openApiSpec: any;
+  hasCustomization: boolean;
+  availableOperations: string[];
+}
+
+export interface RelatedApisData {
+  currentApi: {
+    name: string;
+    domain: string;
+  };
+  relatedApis: Array<{
+    name: string;
+    domain: string;
+    description: string;
+    hasCustomization: boolean;
+  }>;
+  count: number;
+  groupedByDomain: Record<string, Array<{
+    name: string;
+    domain: string;
+    description: string;
+    hasCustomization: boolean;
+  }>>;
 } 
