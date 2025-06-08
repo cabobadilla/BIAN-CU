@@ -111,7 +111,7 @@ const DashboardPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="md:flex md:items-center md:justify-between">
+      <div className="sm:flex sm:items-center sm:justify-between">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
             Dashboard
@@ -120,34 +120,35 @@ const DashboardPage = () => {
             Bienvenido de vuelta, {user?.name || 'Usuario'}
           </p>
         </div>
-        <div className="mt-4 flex md:mt-0 md:ml-4">
+        <div className="mt-4 sm:mt-0 sm:ml-4">
           <Link
             to="/use-cases/new"
-            className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
           >
             <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
-            Nuevo Caso de Uso
+            <span className="hidden sm:inline">Nuevo Caso de Uso</span>
+            <span className="sm:hidden">Nuevo</span>
           </Link>
         </div>
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <div key={stat.name} className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
+            <div className="p-4 sm:p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className={`${stat.color} p-3 rounded-md`}>
-                    <stat.icon className="h-6 w-6 text-white" />
+                  <div className={`${stat.color} p-2 sm:p-3 rounded-md`}>
+                    <stat.icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
                 </div>
-                <div className="ml-5 w-0 flex-1">
+                <div className="ml-3 sm:ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
+                    <dt className="text-xs sm:text-sm font-medium text-gray-500 truncate">
                       {stat.name}
                     </dt>
-                    <dd className="text-lg font-medium text-gray-900">
+                    <dd className="text-lg sm:text-xl font-medium text-gray-900">
                       {stat.value}
                     </dd>
                   </dl>
@@ -170,39 +171,49 @@ const DashboardPage = () => {
         </div>
         <ul className="divide-y divide-gray-200">
           {useCases.length === 0 ? (
-            <li className="px-4 py-4 text-center text-gray-500">
-              No tienes casos de uso aún.{' '}
-              <Link to="/use-cases/new" className="text-blue-600 hover:text-blue-500">
-                Crea tu primer caso de uso
-              </Link>
+            <li className="px-4 py-6 text-center text-gray-500">
+              <div className="space-y-2">
+                <p>No tienes casos de uso aún.</p>
+                <Link 
+                  to="/use-cases/new" 
+                  className="inline-flex items-center text-blue-600 hover:text-blue-500 font-medium"
+                >
+                  <PlusIcon className="h-4 w-4 mr-1" />
+                  Crea tu primer caso de uso
+                </Link>
+              </div>
             </li>
           ) : (
             useCases.map((useCase) => (
               <li key={useCase._id}>
                 <Link
                   to={`/use-cases/${useCase._id}`}
-                  className="block hover:bg-gray-50 px-4 py-4 sm:px-6"
+                  className="block hover:bg-gray-50 px-4 py-4 sm:px-6 transition-colors duration-200"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center">
+                    <div className="flex items-center min-w-0 flex-1">
                       <div className="flex-shrink-0">
                         {getStatusIcon(useCase.status)}
                       </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
+                      <div className="ml-4 min-w-0 flex-1">
+                        <div className="text-sm font-medium text-gray-900 truncate">
                           {useCase.title}
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-500 truncate">
                           {useCase.description}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 ml-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(useCase.status)}`}>
                         {getStatusText(useCase.status)}
                       </span>
-                      <div className="text-sm text-gray-500">
-                        {new Date(useCase.updatedAt).toLocaleDateString()}
+                      <div className="text-sm text-gray-500 hidden sm:block">
+                        {new Date(useCase.createdAt).toLocaleDateString('es-ES', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}
                       </div>
                     </div>
                   </div>
@@ -211,72 +222,6 @@ const DashboardPage = () => {
             ))
           )}
         </ul>
-      </div>
-
-      {/* Acciones rápidas */}
-      <div className="bg-white shadow sm:rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">
-            Acciones Rápidas
-          </h3>
-          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Link
-              to="/use-cases/new"
-              className="relative group bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-500 rounded-lg border border-gray-300 hover:border-gray-400"
-            >
-              <div>
-                <span className="rounded-lg inline-flex p-3 bg-blue-50 text-blue-700 ring-4 ring-white">
-                  <PlusIcon className="h-6 w-6" />
-                </span>
-              </div>
-              <div className="mt-8">
-                <h3 className="text-lg font-medium">
-                  <span className="absolute inset-0" />
-                  Crear Caso de Uso
-                </h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  Inicia un nuevo caso de uso bancario con análisis IA
-                </p>
-              </div>
-            </Link>
-
-            <Link
-              to="/company"
-              className="relative group bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-500 rounded-lg border border-gray-300 hover:border-gray-400"
-            >
-              <div>
-                <span className="rounded-lg inline-flex p-3 bg-green-50 text-green-700 ring-4 ring-white">
-                  <ChartBarIcon className="h-6 w-6" />
-                </span>
-              </div>
-              <div className="mt-8">
-                <h3 className="text-lg font-medium">
-                  <span className="absolute inset-0" />
-                  Gestión de Empresa
-                </h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  Configura tu empresa y gestiona usuarios
-                </p>
-              </div>
-            </Link>
-
-            <div className="relative group bg-white p-6 rounded-lg border border-gray-300 opacity-50">
-              <div>
-                <span className="rounded-lg inline-flex p-3 bg-gray-50 text-gray-400 ring-4 ring-white">
-                  <DocumentTextIcon className="h-6 w-6" />
-                </span>
-              </div>
-              <div className="mt-8">
-                <h3 className="text-lg font-medium text-gray-400">
-                  Reportes y Analytics
-                </h3>
-                <p className="mt-2 text-sm text-gray-400">
-                  Próximamente: Análisis detallado de casos de uso
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

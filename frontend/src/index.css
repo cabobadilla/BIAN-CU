@@ -62,3 +62,70 @@
     @apply badge bg-blue-100 text-blue-800;
   }
 }
+
+@layer utilities {
+  /* Responsive container utilities */
+  .container-responsive {
+    @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  /* Responsive grid utilities */
+  .grid-responsive {
+    @apply grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+  
+  .grid-responsive-2 {
+    @apply grid grid-cols-1 gap-4 sm:grid-cols-2;
+  }
+  
+  .grid-responsive-3 {
+    @apply grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3;
+  }
+  
+  /* Responsive text utilities */
+  .text-responsive {
+    @apply text-sm sm:text-base lg:text-lg;
+  }
+  
+  .heading-responsive {
+    @apply text-xl sm:text-2xl lg:text-3xl;
+  }
+  
+  /* Responsive spacing utilities */
+  .space-responsive {
+    @apply space-y-4 sm:space-y-6 lg:space-y-8;
+  }
+  
+  .padding-responsive {
+    @apply p-4 sm:p-6 lg:p-8;
+  }
+  
+  /* Mobile-first navigation */
+  .nav-mobile {
+    @apply block lg:hidden;
+  }
+  
+  .nav-desktop {
+    @apply hidden lg:block;
+  }
+  
+  /* Responsive flex utilities */
+  .flex-responsive {
+    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between;
+  }
+  
+  /* Truncate text for mobile */
+  .truncate-mobile {
+    @apply truncate sm:whitespace-normal;
+  }
+  
+  /* Hide on mobile */
+  .hidden-mobile {
+    @apply hidden sm:block;
+  }
+  
+  /* Show only on mobile */
+  .mobile-only {
+    @apply block sm:hidden;
+  }
+}

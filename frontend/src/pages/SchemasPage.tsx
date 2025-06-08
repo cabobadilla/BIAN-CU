@@ -132,21 +132,25 @@ const SchemasPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Gestión de Schemas</h1>
-            <p className="mt-2 text-gray-600">
-              Administra los schemas de datos que se utilizarán en los casos de uso
-            </p>
-          </div>
+    <div className="space-y-6">
+      <div className="sm:flex sm:items-center sm:justify-between">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl sm:truncate">
+            <Code className="inline h-8 w-8 mr-2 text-blue-600" />
+            Gestión de Schemas
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Administra los schemas de datos que se utilizarán en los casos de uso
+          </p>
+        </div>
+        <div className="mt-4 sm:mt-0 sm:ml-4">
           <button
             onClick={() => setIsCreating(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
           >
-            <Plus className="h-5 w-5" />
-            Nuevo Schema
+            <Plus className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Nuevo Schema</span>
+            <span className="sm:hidden">Nuevo</span>
           </button>
         </div>
       </div>
@@ -262,7 +266,7 @@ const SchemasPage: React.FC = () => {
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {schemas?.data?.data?.map((schema: Schema) => (
+            {(schemas?.data?.data as Schema[])?.map((schema: Schema) => (
               <div key={schema._id} className="p-6 hover:bg-gray-50">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
