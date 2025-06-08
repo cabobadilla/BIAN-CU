@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import passport from 'passport';
 import { body, param, query, validationResult } from 'express-validator';
 import { asyncHandler, createError } from '../middleware/errorHandler';
@@ -33,7 +33,7 @@ router.use(passport.authenticate('jwt', { session: false }));
  */
 router.get('/',
   query('status').optional().isIn(['draft', 'analyzing', 'completed', 'archived']),
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw createError('Parámetros de consulta inválidos', 400);
@@ -42,7 +42,18 @@ router.get('/',
     const user = req.user as any;
     const { status } = req.query;
 
-    const useCases = await UseCase.findByUser(user._id, status as string);
+    const query: any = { 
+      $or: [
+        { userId: user._id },
+        { companyId: user.companyId }
+      ]
+    };
+    
+    if (status) {
+      query.status = status;
+    }
+    
+    const useCases = await UseCase.find(query).populate('userId', 'name email').populate('companyId', 'name').sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -75,7 +86,7 @@ router.get('/',
  */
 router.get('/:id',
   param('id').isMongoId(),
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw createError('ID inválido', 400);
@@ -136,20 +147,50 @@ router.post('/',
     body('description').trim().isLength({ min: 10, max: 1000 }).withMessage('La descripción debe tener entre 10 y 1000 caracteres'),
     body('originalText').trim().isLength({ min: 50 }).withMessage('El texto original debe tener al menos 50 caracteres')
   ],
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw createError('Datos de entrada inválidos', 400);
     }
 
     const user = req.user as any;
-    const { title, description, originalText } = req.body;
+    const { 
+      title, 
+      description, 
+      originalText,
+      objective,
+      actors,
+      prerequisites,
+      mainFlow,
+      alternativeFlows,
+      postconditions,
+      businessRules,
+      nonFunctionalRequirements,
+      assumptions,
+      constraints,
+      priority,
+      complexity,
+      estimatedEffort
+    } = req.body;
 
     // Crear caso de uso inicial
     const useCase = new UseCase({
       title,
       description,
       originalText,
+      objective,
+      actors,
+      prerequisites,
+      mainFlow,
+      alternativeFlows,
+      postconditions,
+      businessRules,
+      nonFunctionalRequirements,
+      assumptions,
+      constraints,
+      priority,
+      complexity,
+      estimatedEffort,
       companyId: user.companyId,
       userId: user._id,
       status: 'draft'
@@ -160,7 +201,8 @@ router.post('/',
     // Iniciar análisis con ChatGPT en background
     setImmediate(async () => {
       try {
-        await useCase.updateStatus('analyzing');
+        useCase.status = 'analyzing';
+        await useCase.save();
         
         const analysis = await openaiService.analyzeUseCase(originalText);
         
@@ -180,6 +222,244 @@ router.post('/',
       success: true,
       data: useCase,
       message: 'Caso de uso creado. El análisis se está procesando.'
+    });
+  })
+);
+
+/**
+ * @swagger
+ * /api/v1/use-cases/analyze-ai:
+ *   post:
+ *     summary: Analizar caso de uso con IA para obtener sugerencias
+ *     tags: [Use Cases]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - description
+ *               - objective
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               objective:
+ *                 type: string
+ *               actors:
+ *                 type: object
+ *               prerequisites:
+ *                 type: array
+ *               mainFlow:
+ *                 type: array
+ *               postconditions:
+ *                 type: array
+ *               businessRules:
+ *                 type: array
+ *     responses:
+ *       200:
+ *         description: Sugerencias de IA generadas
+ */
+router.post('/analyze-ai',
+  [
+    body('title').trim().isLength({ min: 3 }).withMessage('El título es requerido'),
+    body('description').trim().isLength({ min: 10 }).withMessage('La descripción es requerida'),
+    body('objective').trim().isLength({ min: 10 }).withMessage('El objetivo es requerido')
+  ],
+  asyncHandler(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw createError('Datos de entrada inválidos', 400);
+    }
+
+    const { title, description, objective, actors, prerequisites, mainFlow, postconditions, businessRules } = req.body;
+
+    // Construir texto estructurado para análisis
+    const structuredText = `
+TÍTULO: ${title}
+OBJETIVO: ${objective}
+DESCRIPCIÓN: ${description}
+
+ACTORES PRIMARIOS: ${actors?.primary?.join(', ') || 'No especificados'}
+ACTORES SECUNDARIOS: ${actors?.secondary?.join(', ') || 'No especificados'}
+SISTEMAS: ${actors?.systems?.join(', ') || 'No especificados'}
+
+PRERREQUISITOS:
+${prerequisites?.map((p: string, i: number) => `${i + 1}. ${p}`).join('\n') || 'No especificados'}
+
+FLUJO PRINCIPAL:
+${mainFlow?.map((s: any) => `${s.step}. ${s.actor}: ${s.action} - ${s.description}`).join('\n') || 'No especificado'}
+
+POSTCONDICIONES:
+${postconditions?.map((p: string, i: number) => `${i + 1}. ${p}`).join('\n') || 'No especificadas'}
+
+REGLAS DE NEGOCIO:
+${businessRules?.map((r: string, i: number) => `${i + 1}. ${r}`).join('\n') || 'No especificadas'}
+    `.trim();
+
+    // Obtener sugerencias de IA
+    const suggestions = await openaiService.analyzeCaseForSuggestions(structuredText);
+
+    res.json({
+      success: true,
+      data: suggestions
+    });
+  })
+);
+
+/**
+ * @swagger
+ * /api/v1/use-cases/ai-suggest-content:
+ *   post:
+ *     summary: Sugerir contenido AI para campos del caso de uso
+ *     tags: [Use Cases]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               objective:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Contenido sugerido por AI
+ */
+router.post('/ai-suggest-content',
+  [
+    body('title').trim().isLength({ min: 3 }).withMessage('El título es requerido')
+  ],
+  asyncHandler(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw createError('Datos de entrada inválidos', 400);
+    }
+
+    const { title, description, objective } = req.body;
+
+    // Crear contexto para AI
+    const context = `
+TÍTULO: ${title}
+${description ? `DESCRIPCIÓN: ${description}` : ''}
+${objective ? `OBJETIVO: ${objective}` : ''}
+    `.trim();
+
+    // Obtener sugerencias de contenido
+    const suggestions = await openaiService.suggestUseCaseContent(context);
+
+    res.json({
+      success: true,
+      data: suggestions
+    });
+  })
+);
+
+/**
+ * @swagger
+ * /api/v1/use-cases/ai-suggest-apis:
+ *   post:
+ *     summary: Sugerir APIs por dominio usando AI
+ *     tags: [Use Cases]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - domains
+ *               - useCaseContext
+ *             properties:
+ *               domains:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               useCaseContext:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: APIs sugeridas por dominio
+ */
+router.post('/ai-suggest-apis',
+  [
+    body('domains').isArray({ min: 1 }).withMessage('Debe proporcionar al menos un dominio'),
+    body('useCaseContext').trim().isLength({ min: 10 }).withMessage('El contexto del caso de uso es requerido')
+  ],
+  asyncHandler(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw createError('Datos de entrada inválidos', 400);
+    }
+
+    const { domains, useCaseContext } = req.body;
+
+    // Obtener sugerencias de APIs por dominio
+    const suggestions = await openaiService.suggestApisByDomain(domains, useCaseContext);
+
+    res.json({
+      success: true,
+      data: suggestions
+    });
+  })
+);
+
+/**
+ * @swagger
+ * /api/v1/use-cases/recommend-domains:
+ *   post:
+ *     summary: Recomendar dominios BIAN para un caso de uso
+ *     tags: [Use Cases]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - useCaseText
+ *             properties:
+ *               useCaseText:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Dominios BIAN recomendados
+ */
+router.post('/recommend-domains',
+  [
+    body('useCaseText').trim().isLength({ min: 10 }).withMessage('El texto del caso de uso es requerido')
+  ],
+  asyncHandler(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw createError('Datos de entrada inválidos', 400);
+    }
+
+    const { useCaseText } = req.body;
+
+    // Obtener recomendaciones de dominios BIAN
+    const recommendations = await openaiService.suggestBianDomains(useCaseText);
+
+    res.json({
+      success: true,
+      data: recommendations
     });
   })
 );
@@ -220,7 +500,7 @@ router.post('/:id/domains',
     param('id').isMongoId(),
     body('domains').isArray({ min: 1 }).withMessage('Debe seleccionar al menos un dominio')
   ],
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw createError('Datos inválidos', 400);
@@ -291,7 +571,7 @@ router.post('/:id/apis',
     param('id').isMongoId(),
     body('apis').isArray({ min: 1 }).withMessage('Debe seleccionar al menos una API')
   ],
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw createError('Datos inválidos', 400);
@@ -345,7 +625,7 @@ router.put('/:id',
     body('description').optional().trim().isLength({ min: 10, max: 1000 }),
     body('status').optional().isIn(['draft', 'analyzing', 'completed', 'archived'])
   ],
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw createError('Datos inválidos', 400);
@@ -362,12 +642,15 @@ router.put('/:id',
     }
 
     // Actualizar campos permitidos
-    const allowedFields = ['title', 'description', 'status'];
-    allowedFields.forEach(field => {
-      if (req.body[field] !== undefined) {
-        useCase[field] = req.body[field];
-      }
-    });
+    if (req.body.title !== undefined) {
+      useCase.title = req.body.title;
+    }
+    if (req.body.description !== undefined) {
+      useCase.description = req.body.description;
+    }
+    if (req.body.status !== undefined) {
+      useCase.status = req.body.status;
+    }
 
     await useCase.save();
 
@@ -398,7 +681,7 @@ router.put('/:id',
  */
 router.delete('/:id',
   param('id').isMongoId(),
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw createError('ID inválido', 400);

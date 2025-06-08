@@ -181,3 +181,6 @@ elasticsearch/
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Project documentation - Especificación técnica interna
+Project.md

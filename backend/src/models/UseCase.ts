@@ -8,6 +8,44 @@ export interface IUseCase extends Document {
   userId: mongoose.Types.ObjectId;
   status: 'draft' | 'analyzing' | 'completed' | 'archived';
   
+  // Campos estructurados del caso de uso
+  objective?: string;
+  actors?: {
+    primary: string[];
+    secondary: string[];
+    systems: string[];
+  };
+  prerequisites?: string[];
+  mainFlow?: Array<{
+    step: number;
+    actor: string;
+    action: string;
+    description: string;
+  }>;
+  alternativeFlows?: Array<{
+    name: string;
+    condition: string;
+    steps: Array<{
+      step: number;
+      actor: string;
+      action: string;
+      description: string;
+    }>;
+  }>;
+  postconditions?: string[];
+  businessRules?: string[];
+  nonFunctionalRequirements?: {
+    performance?: string;
+    security?: string;
+    usability?: string;
+    availability?: string;
+  };
+  assumptions?: string[];
+  constraints?: string[];
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  complexity?: 'low' | 'medium' | 'high';
+  estimatedEffort?: string;
+  
   // Análisis de ChatGPT
   analysis: {
     businessObjectives: string[];
@@ -95,6 +133,58 @@ const useCaseSchema = new Schema<IUseCase>({
     enum: ['draft', 'analyzing', 'completed', 'archived'],
     default: 'draft',
     index: true
+  },
+  
+  // Campos estructurados del caso de uso
+  objective: {
+    type: String,
+    trim: true
+  },
+  actors: {
+    primary: [String],
+    secondary: [String],
+    systems: [String]
+  },
+  prerequisites: [String],
+  mainFlow: [{
+    step: { type: Number, required: true },
+    actor: { type: String, required: true },
+    action: { type: String, required: true },
+    description: { type: String, required: true }
+  }],
+  alternativeFlows: [{
+    name: { type: String, required: true },
+    condition: { type: String, required: true },
+    steps: [{
+      step: { type: Number, required: true },
+      actor: { type: String, required: true },
+      action: { type: String, required: true },
+      description: { type: String, required: true }
+    }]
+  }],
+  postconditions: [String],
+  businessRules: [String],
+  nonFunctionalRequirements: {
+    performance: String,
+    security: String,
+    usability: String,
+    availability: String
+  },
+  assumptions: [String],
+  constraints: [String],
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'critical'],
+    default: 'medium'
+  },
+  complexity: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    default: 'medium'
+  },
+  estimatedEffort: {
+    type: String,
+    trim: true
   },
   analysis: {
     businessObjectives: [String],

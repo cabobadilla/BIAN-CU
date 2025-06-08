@@ -8,7 +8,9 @@ import {
   LogOut, 
   User,
   Menu,
-  X
+  X,
+  Code,
+  Database
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -42,6 +44,18 @@ const Layout = () => {
       href: '/use-cases/new',
       icon: Plus,
       current: location.pathname === '/use-cases/new'
+    },
+    {
+      name: 'Schemas',
+      href: '/schemas',
+      icon: Code,
+      current: location.pathname === '/schemas'
+    },
+    {
+      name: 'Sistemas de Origen',
+      href: '/data-sources',
+      icon: Database,
+      current: location.pathname === '/data-sources'
     },
     {
       name: 'Empresa',

@@ -4,6 +4,8 @@ import { logger } from '../utils/logger';
 export interface AppError extends Error {
   statusCode?: number;
   isOperational?: boolean;
+  errors?: any;
+  code?: number;
 }
 
 export const createError = (message: string, statusCode: number = 500): AppError => {
@@ -14,12 +16,12 @@ export const createError = (message: string, statusCode: number = 500): AppError
 };
 
 export const errorHandler = (
-  err: AppError,
+  err: any,
   req: Request,
   res: Response,
   next: NextFunction
 ): void => {
-  let error = { ...err };
+  let error: AppError = { ...err };
   error.message = err.message;
 
   // Log del error
@@ -33,8 +35,8 @@ export const errorHandler = (
   });
 
   // Error de validación de Mongoose
-  if (err.name === 'ValidationError') {
-    const message = Object.values(err.errors || {}).map((val: any) => val.message).join(', ');
+  if (err.name === 'ValidationError' && err.errors) {
+    const message = Object.values(err.errors).map((val: any) => val.message).join(', ');
     error = createError(message, 400);
   }
 

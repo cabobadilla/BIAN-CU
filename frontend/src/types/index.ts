@@ -3,6 +3,43 @@ export interface UseCase {
   title: string;
   description: string;
   originalText: string;
+  // Campos estructurados del caso de uso
+  objective: string;
+  actors: {
+    primary: string[];
+    secondary: string[];
+    systems: string[];
+  };
+  prerequisites: string[];
+  mainFlow: {
+    step: number;
+    actor: string;
+    action: string;
+    description: string;
+  }[];
+  alternativeFlows?: {
+    name: string;
+    condition: string;
+    steps: {
+      step: number;
+      actor: string;
+      action: string;
+      description: string;
+    }[];
+  }[];
+  postconditions: string[];
+  businessRules: string[];
+  nonFunctionalRequirements?: {
+    performance?: string;
+    security?: string;
+    usability?: string;
+    availability?: string;
+  };
+  assumptions: string[];
+  constraints: string[];
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  complexity: 'low' | 'medium' | 'high';
+  estimatedEffort?: string;
   status: 'draft' | 'analyzing' | 'analyzed' | 'domains_selected' | 'apis_selected' | 'completed';
   aiAnalysis?: {
     summary: string;
@@ -41,6 +78,13 @@ export interface BianApi {
   operationType: 'CR' | 'UP' | 'RQ' | 'BQ';
   endpoint: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  availableMethods?: ('GET' | 'POST' | 'PUT' | 'DELETE')[];
+  parameters?: {
+    name: string;
+    type: string;
+    required?: boolean;
+    description?: string;
+  }[];
   requestSchema?: Record<string, unknown>;
   responseSchema?: Record<string, unknown>;
 }

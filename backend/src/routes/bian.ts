@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import passport from 'passport';
 import { query, validationResult } from 'express-validator';
 import { asyncHandler, createError } from '../middleware/errorHandler';
@@ -29,7 +29,7 @@ router.use(passport.authenticate('jwt', { session: false }));
  */
 router.get('/domains',
   query('search').optional().trim().isLength({ min: 2 }),
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw createError('Parámetros de búsqueda inválidos', 400);
@@ -74,7 +74,7 @@ router.get('/domains',
  *         description: Dominio no encontrado
  */
 router.get('/domains/:domainName',
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const { domainName } = req.params;
     
     const domain = await bianService.getDomainByName(domainName);
@@ -119,7 +119,7 @@ router.get('/domains/:domainName',
  *         description: APIs sugeridas para los dominios
  */
 router.post('/apis',
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const { domains, useCaseContext } = req.body;
 
     if (!domains || !Array.isArray(domains) || domains.length === 0) {
@@ -161,7 +161,7 @@ router.post('/apis',
  *         description: API no encontrada
  */
 router.get('/apis/:apiName',
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const { apiName } = req.params;
     
     const api = await bianService.getApiDetails(apiName);
@@ -206,7 +206,7 @@ router.get('/apis/:apiName',
  *         description: Resultado de la validación
  */
 router.post('/validate-domains',
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const { domains, useCaseText } = req.body;
 
     if (!domains || !Array.isArray(domains) || domains.length === 0) {

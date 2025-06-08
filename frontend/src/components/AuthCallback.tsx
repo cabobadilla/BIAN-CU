@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { authService } from '../services/api';
+import axios from 'axios';
 import LoadingSpinner from './LoadingSpinner';
 
 const AuthCallback = () => {
@@ -29,12 +29,15 @@ const AuthCallback = () => {
           return;
         }
 
-        // Guardar token temporalmente para hacer la petición
-        const tempStore = useAuthStore.getState();
-        tempStore.token = token;
+        // Hacer petición directa con el token para obtener información del usuario
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const response = await axios.get(`${API_BASE_URL}/api/v1/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
 
-        // Obtener información del usuario
-        const response = await authService.getMe();
         const userData = response.data.data;
 
         // Configurar autenticación completa

@@ -8,8 +8,12 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import UseCasePage from './pages/UseCasePage';
 import CreateUseCasePage from './pages/CreateUseCasePage';
+import SelectDomainsPage from './pages/SelectDomainsPage';
+import SelectApisPage from './pages/SelectApisPage';
+import SchemasPage from './pages/SchemasPage';
+import DataSourcesPage from './pages/DataSourcesPage';
 import CompanyPage from './pages/CompanyPage';
-import AuthCallback from './components/AuthCallback';
+import AuthCallback from './pages/AuthCallbackPage';
 import Layout from './components/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
 
@@ -102,7 +106,11 @@ function App() {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="use-cases/new" element={<CreateUseCasePage />} />
+              <Route path="use-cases/:id/select-domains" element={<SelectDomainsPage />} />
+              <Route path="use-cases/:id/select-apis" element={<SelectApisPage />} />
               <Route path="use-cases/:id" element={<UseCasePage />} />
+              <Route path="schemas" element={<SchemasPage />} />
+              <Route path="data-sources" element={<DataSourcesPage />} />
               <Route path="company" element={<CompanyPage />} />
             </Route>
 

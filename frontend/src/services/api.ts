@@ -73,7 +73,47 @@ export const useCaseService = {
   getById: (id: string) => 
     api.get<ApiResponse<unknown>>(`/use-cases/${id}`),
   
-  create: (data: { title: string; description: string; originalText: string }) =>
+  create: (data: { 
+    title: string; 
+    description: string; 
+    originalText: string;
+    objective?: string;
+    actors?: {
+      primary: string[];
+      secondary: string[];
+      systems: string[];
+    };
+    prerequisites?: string[];
+    mainFlow?: Array<{
+      step: number;
+      actor: string;
+      action: string;
+      description: string;
+    }>;
+    alternativeFlows?: Array<{
+      name: string;
+      condition: string;
+      steps: Array<{
+        step: number;
+        actor: string;
+        action: string;
+        description: string;
+      }>;
+    }>;
+    postconditions?: string[];
+    businessRules?: string[];
+    nonFunctionalRequirements?: {
+      performance?: string;
+      security?: string;
+      usability?: string;
+      availability?: string;
+    };
+    assumptions?: string[];
+    constraints?: string[];
+    priority?: 'low' | 'medium' | 'high' | 'critical';
+    complexity?: 'low' | 'medium' | 'high';
+    estimatedEffort?: string;
+  }) =>
     api.post<ApiResponse<unknown>>('/use-cases', data),
   
   update: (id: string, data: Partial<Record<string, unknown>>) =>
@@ -87,6 +127,28 @@ export const useCaseService = {
   
   selectApis: (id: string, apis: string[]) =>
     api.post<ApiResponse<unknown>>(`/use-cases/${id}/apis`, { apis }),
+
+  analyzeWithAI: (useCaseData: {
+    title: string;
+    description: string;
+    objective: string;
+    actors: any;
+    prerequisites: string[];
+    mainFlow: any[];
+    postconditions: string[];
+    businessRules: string[];
+  }) =>
+    api.post<ApiResponse<unknown>>('/use-cases/analyze-ai', useCaseData),
+
+  // Nuevos endpoints de AI
+  aiSuggestContent: (data: { title: string; description?: string; objective?: string }) =>
+    api.post<ApiResponse<any>>('/use-cases/ai-suggest-content', data),
+
+  aiSuggestApis: (data: { domains: string[]; useCaseContext: string }) =>
+    api.post<ApiResponse<any>>('/use-cases/ai-suggest-apis', data),
+
+  recommendDomains: (useCaseText: string) =>
+    api.post<ApiResponse<unknown>>('/use-cases/recommend-domains', { useCaseText }),
 };
 
 // Servicios de dominios BIAN
@@ -112,38 +174,74 @@ export const bianService = {
 
 // Servicios de schemas personalizados
 export const schemaService = {
+  // CRUD básico para schemas
+  getAll: () =>
+    api.get<ApiResponse<unknown[]>>('/schemas'),
+  
+  getById: (id: string) =>
+    api.get<ApiResponse<unknown>>(`/schemas/${id}`),
+  
+  create: (data: { name: string; description: string; schema: any }) =>
+    api.post<ApiResponse<unknown>>('/schemas', data),
+  
+  update: (id: string, data: { name?: string; description?: string; schema?: any }) =>
+    api.put<ApiResponse<unknown>>(`/schemas/${id}`, data),
+  
+  delete: (id: string) =>
+    api.delete<ApiResponse<unknown>>(`/schemas/${id}`),
+
+  // Generación con IA
   generate: (description: string, apiContext?: string) =>
     api.post<ApiResponse<unknown>>('/schemas/generate', { description, apiContext }),
   
+  // Métodos para casos de uso (mantener compatibilidad)
   addToUseCase: (useCaseId: string, schema: Record<string, unknown>) =>
     api.post<ApiResponse<unknown>>(`/schemas/use-case/${useCaseId}`, schema),
   
   getFromUseCase: (useCaseId: string) =>
     api.get<ApiResponse<unknown[]>>(`/schemas/use-case/${useCaseId}`),
   
-  update: (useCaseId: string, schemaIndex: number, data: Record<string, unknown>) =>
+  updateInUseCase: (useCaseId: string, schemaIndex: number, data: Record<string, unknown>) =>
     api.put<ApiResponse<unknown>>(`/schemas/use-case/${useCaseId}/${schemaIndex}`, data),
   
-  delete: (useCaseId: string, schemaIndex: number) =>
+  deleteFromUseCase: (useCaseId: string, schemaIndex: number) =>
     api.delete<ApiResponse<unknown>>(`/schemas/use-case/${useCaseId}/${schemaIndex}`),
 };
 
 // Servicios de fuentes de datos
 export const dataSourceService = {
+  // CRUD básico para fuentes de datos
+  getAll: () =>
+    api.get<ApiResponse<unknown[]>>('/data-sources'),
+  
+  getById: (id: string) =>
+    api.get<ApiResponse<unknown>>(`/data-sources/${id}`),
+  
+  create: (data: { name: string; description: string; type: string; connectionConfig: any }) =>
+    api.post<ApiResponse<unknown>>('/data-sources', data),
+  
+  update: (id: string, data: { name?: string; description?: string; type?: string; connectionConfig?: any }) =>
+    api.put<ApiResponse<unknown>>(`/data-sources/${id}`, data),
+  
+  delete: (id: string) =>
+    api.delete<ApiResponse<unknown>>(`/data-sources/${id}`),
+
+  // Validación de conexión
+  validateConnection: (connection: { dataSourceId?: string; apiUrl: string; method: string; payload?: Record<string, unknown>; headers?: Record<string, string> }) =>
+    api.post<ApiResponse<unknown>>('/data-sources/validate-connection', connection),
+
+  // Métodos para casos de uso (mantener compatibilidad)
   addToUseCase: (useCaseId: string, dataSource: Record<string, unknown>) =>
     api.post<ApiResponse<unknown>>(`/data-sources/use-case/${useCaseId}`, dataSource),
   
   getFromUseCase: (useCaseId: string) =>
     api.get<ApiResponse<unknown[]>>(`/data-sources/use-case/${useCaseId}`),
   
-  update: (useCaseId: string, dataSourceIndex: number, data: Record<string, unknown>) =>
+  updateInUseCase: (useCaseId: string, dataSourceIndex: number, data: Record<string, unknown>) =>
     api.put<ApiResponse<unknown>>(`/data-sources/use-case/${useCaseId}/${dataSourceIndex}`, data),
   
-  delete: (useCaseId: string, dataSourceIndex: number) =>
+  deleteFromUseCase: (useCaseId: string, dataSourceIndex: number) =>
     api.delete<ApiResponse<unknown>>(`/data-sources/use-case/${useCaseId}/${dataSourceIndex}`),
-  
-  validateConnection: (connection: { apiUrl: string; method: string; payload?: Record<string, unknown>; headers?: Record<string, string> }) =>
-    api.post<ApiResponse<unknown>>('/data-sources/validate-connection', connection),
 };
 
 // Servicios de empresa

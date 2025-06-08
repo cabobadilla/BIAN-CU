@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import passport from 'passport';
 import { body, validationResult } from 'express-validator';
 import { asyncHandler, createError } from '../middleware/errorHandler';
@@ -23,7 +23,7 @@ router.use(passport.authenticate('jwt', { session: false }));
  *         description: Información de la empresa
  */
 router.get('/current',
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as any;
     
     const company = await Company.findById(user.companyId);
@@ -52,7 +52,7 @@ router.get('/current',
  *         description: Lista de usuarios de la empresa
  */
 router.get('/current/users',
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as any;
     
     // Solo administradores pueden ver todos los usuarios
@@ -60,7 +60,7 @@ router.get('/current/users',
       throw createError('No autorizado para ver usuarios de la empresa', 403);
     }
 
-    const users = await User.findByCompany(user.companyId);
+    const users = await User.find({ companyId: user.companyId, isActive: true }).populate('companyId');
 
     res.json({
       success: true,
@@ -114,7 +114,7 @@ router.put('/current',
     body('settings.maxUsers').optional().isInt({ min: 1, max: 1000 }),
     body('settings.features').optional().isArray()
   ],
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw createError('Datos de entrada inválidos', 400);
@@ -195,7 +195,7 @@ router.put('/current/users/:userId/role',
   [
     body('role').isIn(['admin', 'user']).withMessage('Rol debe ser admin o user')
   ],
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw createError('Rol inválido', 400);
@@ -281,7 +281,7 @@ router.put('/current/users/:userId/status',
   [
     body('isActive').isBoolean().withMessage('isActive debe ser un booleano')
   ],
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw createError('Estado inválido', 400);

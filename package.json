@@ -11,7 +11,9 @@
     "build:backend": "cd backend && npm run build",
     "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
     "lint": "concurrently \"cd frontend && npm run lint\" \"cd backend && npm run lint\"",
-    "test": "concurrently \"cd frontend && npm run test\" \"cd backend && npm run test\""
+    "test": "concurrently \"cd frontend && npm run test\" \"cd backend && npm run test\"",
+    "test:system": "./test-system.sh",
+    "test:system:verbose": "bash -x ./test-system.sh"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

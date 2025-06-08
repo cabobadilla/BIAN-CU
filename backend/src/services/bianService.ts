@@ -197,7 +197,7 @@ class BianService {
     return this.domains.find(domain => domain.name === name) || null;
   }
 
-  async getApisForDomains(domainNames: string[], useCaseContext?: string): Promise<BianApi[]> {
+  async getApisForDomains(domainNames: string[], useCaseContext?: string): Promise<any[]> {
     try {
       const selectedDomains = this.domains.filter(domain => 
         domainNames.includes(domain.name)
@@ -233,12 +233,65 @@ class BianService {
         }
       }
 
-      return suggestedApis;
+      // Transformar APIs al formato esperado por el frontend
+      return this.transformApisForFrontend(suggestedApis);
 
     } catch (error) {
       logger.error('Error obteniendo APIs para dominios:', error);
       throw new Error('Error obteniendo APIs sugeridas');
     }
+  }
+
+  private transformApisForFrontend(apis: BianApi[]): any[] {
+    return apis.flatMap(api => {
+      // Crear una entrada por cada endpoint
+      return api.endpoints.map(endpoint => ({
+        name: `${api.name} - ${endpoint.operation}`,
+        domain: api.domain,
+        description: endpoint.description || api.description,
+        version: '13.0.0',
+        operationType: this.mapOperationToType(endpoint.operation),
+        endpoint: endpoint.path,
+        method: endpoint.method,
+        availableMethods: api.endpoints.map(e => e.method),
+        parameters: this.extractParametersFromPath(endpoint.path),
+        requestSchema: {},
+        responseSchema: {}
+      }));
+    });
+  }
+
+  private mapOperationToType(operation: string): 'CR' | 'UP' | 'RQ' | 'BQ' {
+    const operationMap: Record<string, 'CR' | 'UP' | 'RQ' | 'BQ'> = {
+      'Register': 'CR',
+      'Initiate': 'CR',
+      'Create': 'CR',
+      'Update': 'UP',
+      'Modify': 'UP',
+      'Retrieve': 'RQ',
+      'Get': 'RQ',
+      'Request': 'RQ',
+      'Evaluate': 'BQ',
+      'Execute': 'BQ',
+      'Process': 'BQ'
+    };
+    
+    return operationMap[operation] || 'RQ';
+  }
+
+  private extractParametersFromPath(path: string): { name: string; type: string; required: boolean }[] {
+    const paramMatches = path.match(/\{([^}]+)\}/g);
+    if (!paramMatches) return [];
+    
+    return paramMatches.map(match => {
+      const paramName = match.slice(1, -1); // Remove { }
+      return {
+        name: paramName,
+        type: 'string',
+        required: true,
+        description: `Path parameter: ${paramName}`
+      };
+    });
   }
 
   private async refineApiSuggestions(

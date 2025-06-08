@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import { asyncHandler } from '../middleware/errorHandler';
@@ -35,37 +35,50 @@ router.get('/google',
  *         description: Redirección después de autenticación
  */
 router.get('/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login?error=auth_failed' }),
-  asyncHandler(async (req, res) => {
-    const user = req.user as any;
-    
-    if (!user) {
-      return res.redirect('/login?error=no_user');
-    }
-
-    // Generar JWT token
-    const token = jwt.sign(
-      { 
-        sub: user._id,
-        email: user.email,
-        companyId: user.companyId,
-        role: user.role
-      },
-      process.env.JWT_SECRET!,
-      { 
-        expiresIn: '24h',
-        issuer: 'bian-cu-platform',
-        audience: 'bian-cu-users'
+  (req: Request, res: Response, next: any) => {
+    passport.authenticate('google', (err: any, user: any, info: any) => {
+      if (err) {
+        logger.error('Error en autenticación Google:', err);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        return res.redirect(`${frontendUrl}/login?error=auth_failed`);
       }
-    );
+      
+      if (!user) {
+        logger.error('No se obtuvo usuario de Google:', info);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        return res.redirect(`${frontendUrl}/login?error=no_user`);
+      }
 
-    // En desarrollo, redirigir al frontend con el token
-    const frontendUrl = process.env.NODE_ENV === 'production' 
-      ? process.env.FRONTEND_URL 
-      : 'http://localhost:5173';
-    
-    res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
-  })
+      // Generar JWT token
+      try {
+        const token = jwt.sign(
+          { 
+            sub: user._id,
+            email: user.email,
+            companyId: user.companyId,
+            role: user.role
+          },
+          process.env.JWT_SECRET!,
+          { 
+            expiresIn: '24h',
+            issuer: 'bian-cu-platform',
+            audience: 'bian-cu-users'
+          }
+        );
+
+        logger.info(`Token generado exitosamente para usuario: ${user.email}`);
+
+        // Redirigir al frontend con el token
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+        
+      } catch (tokenError) {
+        logger.error('Error generando token JWT:', tokenError);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        res.redirect(`${frontendUrl}/login?error=token_failed`);
+      }
+    })(req, res, next);
+  }
 );
 
 /**
@@ -84,7 +97,7 @@ router.get('/google/callback',
  */
 router.get('/me',
   passport.authenticate('jwt', { session: false }),
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as any;
     
     res.json({
@@ -116,7 +129,7 @@ router.get('/me',
  */
 router.post('/logout',
   passport.authenticate('jwt', { session: false }),
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     // En una implementación más robusta, aquí se podría invalidar el token
     // agregándolo a una blacklist en Redis o base de datos
     
@@ -145,7 +158,7 @@ router.post('/logout',
  */
 router.post('/refresh',
   passport.authenticate('jwt', { session: false }),
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as any;
     
     // Generar nuevo token

@@ -1,3 +1,7 @@
+// Configurar variables de entorno PRIMERO
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -7,7 +11,6 @@ import MongoStore from 'connect-mongo';
 import passport from 'passport';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
-import dotenv from 'dotenv';
 
 import { connectDB } from './config/database';
 import { logger } from './utils/logger';
@@ -18,9 +21,6 @@ import { useCaseRoutes } from './routes/useCases';
 import { bianRoutes } from './routes/bian';
 import { schemaRoutes } from './routes/schemas';
 import { dataSourceRoutes } from './routes/dataSources';
-
-// Configurar variables de entorno
-dotenv.config({ path: '.env.local' });
 
 const app = express();
 const PORT = process.env.PORT || 3001;

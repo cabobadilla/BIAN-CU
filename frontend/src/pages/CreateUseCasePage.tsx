@@ -1,346 +1,1256 @@
 import React, { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Sparkles, FileText, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Sparkles, Save, FileText, Plus, Trash2, Users, Target, CheckSquare, GitBranch, Shield, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useCaseService } from '../services/api';
-import LoadingSpinner from '../components/LoadingSpinner';
 
-interface FormData {
-  title: string;
+interface FlowStep {
+  step: number;
+  actor: string;
+  action: string;
   description: string;
-  originalText: string;
 }
 
-interface FormErrors {
-  title?: string;
-  description?: string;
-  originalText?: string;
+interface AlternativeFlow {
+  name: string;
+  condition: string;
+  steps: FlowStep[];
 }
 
 const CreateUseCasePage: React.FC = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  
+  // Campos básicos
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [objective, setObjective] = useState('');
+  
+  // Actores
+  const [primaryActors, setPrimaryActors] = useState<string[]>(['']);
+  const [secondaryActors, setSecondaryActors] = useState<string[]>(['']);
+  const [systemActors, setSystemActors] = useState<string[]>(['']);
+  
+  // Flujos
+  const [prerequisites, setPrerequisites] = useState<string[]>(['']);
+  const [mainFlow, setMainFlow] = useState<FlowStep[]>([
+    { step: 1, actor: '', action: '', description: '' }
+  ]);
+  const [alternativeFlows, setAlternativeFlows] = useState<AlternativeFlow[]>([]);
+  const [postconditions, setPostconditions] = useState<string[]>(['']);
+  
+  // Reglas y restricciones
+  const [businessRules, setBusinessRules] = useState<string[]>(['']);
+  const [assumptions, setAssumptions] = useState<string[]>(['']);
+  const [constraints, setConstraints] = useState<string[]>(['']);
+  
+  // Metadatos
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'critical'>('medium');
+  const [complexity, setComplexity] = useState<'low' | 'medium' | 'high'>('medium');
+  const [estimatedEffort, setEstimatedEffort] = useState('');
+  
+  // Requisitos no funcionales
+  const [performance, setPerformance] = useState('');
+  const [security, setSecurity] = useState('');
+  const [usability, setUsability] = useState('');
+  const [availability, setAvailability] = useState('');
 
-  const [formData, setFormData] = useState<FormData>({
-    title: '',
-    description: '',
-    originalText: '',
-  });
+  // Estados para análisis IA
+  const [showAiAnalysis, setShowAiAnalysis] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  
+  // Estados para sugerencias de contenido AI
+  const [showContentSuggestions, setShowContentSuggestions] = useState(false);
+  const [contentSuggestions, setContentSuggestions] = useState<any>(null);
+  const [isGettingContentSuggestions, setIsGettingContentSuggestions] = useState(false);
 
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [showPreview, setShowPreview] = useState(false);
-
-  // Mutación para crear caso de uso
-  const createUseCaseMutation = useMutation({
-    mutationFn: (data: FormData) => useCaseService.create(data),
+  const createMutation = useMutation({
+    mutationFn: useCaseService.create,
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['useCases'] });
-      const useCaseId = (response.data.data as { _id: string })._id;
-      navigate(`/use-cases/${useCaseId}`);
+      console.log('Caso de uso creado exitosamente:', response.data);
+      // La respuesta viene en response.data.data según la estructura de la API
+      const useCaseData = (response.data as any).data;
+      const useCaseId = useCaseData?._id;
+      if (useCaseId) {
+        console.log('Navegando a selección de dominios para caso de uso:', useCaseId);
+        navigate(`/use-cases/${useCaseId}/select-domains`);
+      } else {
+        console.error('No se recibió ID del caso de uso creado. Estructura de respuesta:', response.data);
+        navigate('/dashboard');
+      }
     },
-    onError: (error: unknown) => {
-      console.error('Error creating use case:', error);
+    onError: (error) => {
+      console.error('Error creando caso de uso:', error);
+      alert('Error al crear el caso de uso. Por favor intenta de nuevo.');
     },
   });
 
-  const handleInputChange = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Limpiar error del campo cuando el usuario empiece a escribir
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+  // Funciones auxiliares para manejar arrays
+  const addToArray = (array: string[], setArray: (arr: string[]) => void) => {
+    setArray([...array, '']);
+  };
+
+  const removeFromArray = (array: string[], setArray: (arr: string[]) => void, index: number) => {
+    setArray(array.filter((_, i) => i !== index));
+  };
+
+  const updateArrayItem = (array: string[], setArray: (arr: string[]) => void, index: number, value: string) => {
+    const newArray = [...array];
+    newArray[index] = value;
+    setArray(newArray);
+  };
+
+  // Funciones para manejar flujo principal
+  const addMainFlowStep = () => {
+    setMainFlow([...mainFlow, { step: mainFlow.length + 1, actor: '', action: '', description: '' }]);
+  };
+
+  const removeMainFlowStep = (index: number) => {
+    const newFlow = mainFlow.filter((_, i) => i !== index);
+    // Renumerar pasos
+    const renumberedFlow = newFlow.map((step, i) => ({ ...step, step: i + 1 }));
+    setMainFlow(renumberedFlow);
+  };
+
+  const updateMainFlowStep = (index: number, field: keyof FlowStep, value: string | number) => {
+    const newFlow = [...mainFlow];
+    newFlow[index] = { ...newFlow[index], [field]: value };
+    setMainFlow(newFlow);
+  };
+
+  // Función para analizar con IA
+  const handleAnalyzeWithAI = async () => {
+    if (!title.trim() || !description.trim() || !objective.trim()) {
+      alert('Por favor completa al menos el título, descripción y objetivo antes de analizar');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const useCaseData = {
+        title: title.trim(),
+        description: description.trim(),
+        objective: objective.trim(),
+        actors: {
+          primary: primaryActors.filter(a => a.trim()),
+          secondary: secondaryActors.filter(a => a.trim()),
+          systems: systemActors.filter(a => a.trim())
+        },
+        prerequisites: prerequisites.filter(p => p.trim()),
+        mainFlow: mainFlow.filter(s => s.description.trim()),
+        postconditions: postconditions.filter(p => p.trim()),
+        businessRules: businessRules.filter(r => r.trim())
+      };
+
+      const response = await useCaseService.analyzeWithAI(useCaseData);
+      setAiSuggestions((response.data as any).data);
+      setShowAiAnalysis(true);
+    } catch (error) {
+      console.error('Error analizando con IA:', error);
+      alert('Error al analizar el caso de uso con IA. Por favor intenta de nuevo.');
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.title.trim()) {
-      newErrors.title = 'El título es requerido';
-    } else if (formData.title.length < 5) {
-      newErrors.title = 'El título debe tener al menos 5 caracteres';
+  // Función para obtener sugerencias de contenido AI
+  const handleGetContentSuggestions = async () => {
+    if (!title.trim()) {
+      alert('Por favor ingresa al menos un título para obtener sugerencias');
+      return;
     }
 
-    if (!formData.description.trim()) {
-      newErrors.description = 'La descripción es requerida';
-    } else if (formData.description.length < 20) {
-      newErrors.description = 'La descripción debe tener al menos 20 caracteres';
+    setIsGettingContentSuggestions(true);
+    try {
+      const response = await useCaseService.aiSuggestContent({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        objective: objective.trim() || undefined
+      });
+      
+      setContentSuggestions((response.data as any).data);
+      setShowContentSuggestions(true);
+    } catch (error) {
+      console.error('Error obteniendo sugerencias de contenido:', error);
+      alert('Error al obtener sugerencias de contenido. Por favor intenta de nuevo.');
+    } finally {
+      setIsGettingContentSuggestions(false);
+    }
+  };
+
+  // Función para aplicar sugerencias de contenido
+  const applyContentSuggestions = () => {
+    if (!contentSuggestions) return;
+
+    // Aplicar sugerencias a los campos
+    if (contentSuggestions.suggestedTitle) setTitle(contentSuggestions.suggestedTitle);
+    if (contentSuggestions.suggestedDescription) setDescription(contentSuggestions.suggestedDescription);
+    if (contentSuggestions.suggestedObjective) setObjective(contentSuggestions.suggestedObjective);
+    
+    if (contentSuggestions.suggestedActors) {
+      if (contentSuggestions.suggestedActors.primary) setPrimaryActors([...contentSuggestions.suggestedActors.primary, '']);
+      if (contentSuggestions.suggestedActors.secondary) setSecondaryActors([...contentSuggestions.suggestedActors.secondary, '']);
+      if (contentSuggestions.suggestedActors.systems) setSystemActors([...contentSuggestions.suggestedActors.systems, '']);
     }
 
-    if (!formData.originalText.trim()) {
-      newErrors.originalText = 'El texto del caso de uso es requerido';
-    } else if (formData.originalText.length < 50) {
-      newErrors.originalText = 'El texto debe tener al menos 50 caracteres para un análisis efectivo';
+    if (contentSuggestions.suggestedPrerequisites) {
+      setPrerequisites([...contentSuggestions.suggestedPrerequisites, '']);
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (contentSuggestions.suggestedMainFlow) {
+      setMainFlow([...contentSuggestions.suggestedMainFlow]);
+    }
+
+    if (contentSuggestions.suggestedPostconditions) {
+      setPostconditions([...contentSuggestions.suggestedPostconditions, '']);
+    }
+
+    if (contentSuggestions.suggestedBusinessRules) {
+      setBusinessRules([...contentSuggestions.suggestedBusinessRules, '']);
+    }
+
+    setShowContentSuggestions(false);
+    setContentSuggestions(null);
+  };
+
+  // Función para aplicar sugerencias de IA
+  const applySuggestions = () => {
+    if (!aiSuggestions) return;
+
+    // Aplicar sugerencias a los campos
+    if (aiSuggestions.improvedTitle) setTitle(aiSuggestions.improvedTitle);
+    if (aiSuggestions.improvedDescription) setDescription(aiSuggestions.improvedDescription);
+    if (aiSuggestions.improvedObjective) setObjective(aiSuggestions.improvedObjective);
+    
+    if (aiSuggestions.suggestedActors) {
+      if (aiSuggestions.suggestedActors.primary) setPrimaryActors([...aiSuggestions.suggestedActors.primary, '']);
+      if (aiSuggestions.suggestedActors.secondary) setSecondaryActors([...aiSuggestions.suggestedActors.secondary, '']);
+      if (aiSuggestions.suggestedActors.systems) setSystemActors([...aiSuggestions.suggestedActors.systems, '']);
+    }
+
+    if (aiSuggestions.suggestedPrerequisites) {
+      setPrerequisites([...aiSuggestions.suggestedPrerequisites, '']);
+    }
+
+    if (aiSuggestions.suggestedPostconditions) {
+      setPostconditions([...aiSuggestions.suggestedPostconditions, '']);
+    }
+
+    if (aiSuggestions.suggestedBusinessRules) {
+      setBusinessRules([...aiSuggestions.suggestedBusinessRules, '']);
+    }
+
+    setShowAiAnalysis(false);
+    setAiSuggestions(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    if (!title.trim() || !description.trim() || !objective.trim()) {
+      alert('Por favor completa todos los campos requeridos');
       return;
     }
 
-    createUseCaseMutation.mutate(formData);
-  };
+    // Construir el texto original estructurado para análisis de IA
+    const structuredText = `
+TÍTULO: ${title}
 
-  const handleGoBack = () => {
-    navigate(-1);
-  };
+OBJETIVO: ${objective}
 
-  const exampleUseCases = [
-    {
-      title: "Apertura de Cuenta Corriente Digital",
-      description: "Proceso completo de apertura de cuenta corriente a través de canales digitales",
-      text: "Un cliente desea abrir una cuenta corriente de forma digital. El proceso debe incluir la verificación de identidad, validación de documentos, evaluación de riesgo crediticio, configuración de productos asociados como tarjetas de débito, y la activación de servicios de banca en línea. El sistema debe integrar con bureaus de crédito, validar documentos de identidad, y cumplir con regulaciones KYC y AML."
-    },
-    {
-      title: "Procesamiento de Pagos Internacionales",
-      description: "Gestión de transferencias internacionales con cumplimiento regulatorio",
-      text: "El banco necesita procesar transferencias internacionales de clientes corporativos. El proceso incluye validación de beneficiarios, verificación de sanciones internacionales, cálculo de comisiones y tipos de cambio, enrutamiento a través de redes SWIFT, seguimiento en tiempo real, y notificaciones automáticas. Debe cumplir con regulaciones FATCA, CRS y normativas locales de divisas."
-    }
-  ];
+DESCRIPCIÓN: ${description}
 
-  const loadExample = (example: typeof exampleUseCases[0]) => {
-    setFormData({
-      title: example.title,
-      description: example.description,
-      originalText: example.text,
+ACTORES PRIMARIOS: ${primaryActors.filter(a => a.trim()).join(', ')}
+ACTORES SECUNDARIOS: ${secondaryActors.filter(a => a.trim()).join(', ')}
+SISTEMAS: ${systemActors.filter(a => a.trim()).join(', ')}
+
+PRERREQUISITOS:
+${prerequisites.filter(p => p.trim()).map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+FLUJO PRINCIPAL:
+${mainFlow.filter(s => s.description.trim()).map(s => `${s.step}. ${s.actor}: ${s.action} - ${s.description}`).join('\n')}
+
+POSTCONDICIONES:
+${postconditions.filter(p => p.trim()).map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+REGLAS DE NEGOCIO:
+${businessRules.filter(r => r.trim()).map((r, i) => `${i + 1}. ${r}`).join('\n')}
+
+PRIORIDAD: ${priority}
+COMPLEJIDAD: ${complexity}
+${estimatedEffort ? `ESFUERZO ESTIMADO: ${estimatedEffort}` : ''}
+
+${performance ? `RENDIMIENTO: ${performance}` : ''}
+${security ? `SEGURIDAD: ${security}` : ''}
+${usability ? `USABILIDAD: ${usability}` : ''}
+${availability ? `DISPONIBILIDAD: ${availability}` : ''}
+    `.trim();
+
+    createMutation.mutate({
+      title: title.trim(),
+      description: description.trim(),
+      originalText: structuredText,
+      objective: objective.trim(),
+      actors: {
+        primary: primaryActors.filter(a => a.trim()),
+        secondary: secondaryActors.filter(a => a.trim()),
+        systems: systemActors.filter(a => a.trim())
+      },
+      prerequisites: prerequisites.filter(p => p.trim()),
+      mainFlow: mainFlow.filter(s => s.description.trim()),
+      alternativeFlows,
+      postconditions: postconditions.filter(p => p.trim()),
+      businessRules: businessRules.filter(r => r.trim()),
+      nonFunctionalRequirements: {
+        performance: performance.trim() || undefined,
+        security: security.trim() || undefined,
+        usability: usability.trim() || undefined,
+        availability: availability.trim() || undefined
+      },
+      assumptions: assumptions.filter(a => a.trim()),
+      constraints: constraints.filter(c => c.trim()),
+      priority,
+      complexity,
+      estimatedEffort: estimatedEffort.trim() || undefined
     });
-    setErrors({});
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={handleGoBack}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5 text-gray-600" />
-        </button>
-        <div>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-8">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver al Dashboard
+          </button>
           <h1 className="text-3xl font-bold text-gray-900">Crear Nuevo Caso de Uso</h1>
-          <p className="text-gray-600 mt-1">
-            Describe tu caso de uso bancario y obtén análisis con IA
+          <p className="mt-2 text-gray-600">
+            Define un caso de uso bancario estructurado para análisis con BIAN v13
           </p>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Formulario principal */}
-        <div className="lg:col-span-2">
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border p-6 space-y-6">
-            {/* Título */}
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                Título del Caso de Uso *
-              </label>
-              <input
-                type="text"
-                id="title"
-                value={formData.title}
-                onChange={(e) => handleInputChange('title', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.title ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Ej: Apertura de Cuenta Corriente Digital"
-              />
-              {errors.title && (
-                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4" />
-                  {errors.title}
-                </p>
-              )}
-            </div>
-
-            {/* Descripción */}
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                Descripción Breve *
-              </label>
-              <textarea
-                id="description"
-                rows={3}
-                value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.description ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Descripción concisa del caso de uso..."
-              />
-              {errors.description && (
-                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4" />
-                  {errors.description}
-                </p>
-              )}
-            </div>
-
-            {/* Texto completo */}
-            <div>
-              <label htmlFor="originalText" className="block text-sm font-medium text-gray-700 mb-2">
-                Texto Completo del Caso de Uso *
-              </label>
-              <textarea
-                id="originalText"
-                rows={8}
-                value={formData.originalText}
-                onChange={(e) => handleInputChange('originalText', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.originalText ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Describe detalladamente el caso de uso, incluyendo procesos, actores involucrados, requisitos técnicos y de negocio..."
-              />
-              {errors.originalText && (
-                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4" />
-                  {errors.originalText}
-                </p>
-              )}
-              <p className="mt-1 text-sm text-gray-500">
-                Caracteres: {formData.originalText.length} (mínimo 50 recomendado)
-              </p>
-            </div>
-
-            {/* Botones */}
-            <div className="flex gap-3 pt-4">
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-8">
+          
+          {/* Información Básica */}
+          <div className="bg-white shadow-sm rounded-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <FileText className="h-5 w-5 text-blue-600 mr-2" />
+                <h2 className="text-xl font-semibold text-gray-900">Información Básica</h2>
+              </div>
               <button
                 type="button"
-                onClick={handleGoBack}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                onClick={handleGetContentSuggestions}
+                disabled={isGettingContentSuggestions || !title.trim()}
+                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md shadow-sm hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowPreview(!showPreview)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
-              >
-                <FileText className="h-4 w-4" />
-                {showPreview ? 'Ocultar' : 'Vista Previa'}
-              </button>
-              <button
-                type="submit"
-                disabled={createUseCaseMutation.isPending}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors flex items-center gap-2"
-              >
-                {createUseCaseMutation.isPending ? (
+                {isGettingContentSuggestions ? (
                   <>
-                    <LoadingSpinner />
-                    Creando...
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Analizando...
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-4 w-4" />
-                    Crear y Analizar con IA
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Sugerir con AI
                   </>
                 )}
               </button>
             </div>
-
-            {/* Mensaje de éxito/error */}
-            {createUseCaseMutation.isError && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-center gap-2 text-red-800">
-                  <AlertCircle className="h-5 w-5" />
-                  <span className="font-medium">Error al crear el caso de uso</span>
-                </div>
-                <p className="text-red-700 mt-1">
-                  Por favor, verifica los datos e intenta nuevamente.
-                </p>
+            
+            <div className="grid grid-cols-1 gap-6">
+              <div>
+                <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+                  Título del Caso de Uso *
+                </label>
+                <input
+                  type="text"
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ej: Proceso de Apertura de Cuenta Corriente"
+                  required
+                />
               </div>
-            )}
-          </form>
 
-          {/* Vista previa */}
-          {showPreview && (
-            <div className="bg-white rounded-lg shadow-sm border p-6 mt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Vista Previa</h3>
-              <div className="space-y-4">
+              <div>
+                <label htmlFor="objective" className="block text-sm font-medium text-gray-700 mb-2">
+                  Objetivo del Caso de Uso *
+                </label>
+                <textarea
+                  id="objective"
+                  value={objective}
+                  onChange={(e) => setObjective(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="¿Qué se busca lograr con este caso de uso?"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                  Descripción General *
+                </label>
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Describe brevemente el caso de uso..."
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <h4 className="font-medium text-gray-900">{formData.title || 'Sin título'}</h4>
-                  <p className="text-gray-600 mt-1">{formData.description || 'Sin descripción'}</p>
+                  <label htmlFor="priority" className="block text-sm font-medium text-gray-700 mb-2">
+                    Prioridad
+                  </label>
+                  <select
+                    id="priority"
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="low">Baja</option>
+                    <option value="medium">Media</option>
+                    <option value="high">Alta</option>
+                    <option value="critical">Crítica</option>
+                  </select>
                 </div>
+
                 <div>
-                  <h5 className="text-sm font-medium text-gray-700 mb-2">Texto completo:</h5>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-gray-700 whitespace-pre-wrap">
-                      {formData.originalText || 'Sin contenido'}
-                    </p>
-                  </div>
+                  <label htmlFor="complexity" className="block text-sm font-medium text-gray-700 mb-2">
+                    Complejidad
+                  </label>
+                  <select
+                    id="complexity"
+                    value={complexity}
+                    onChange={(e) => setComplexity(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="low">Baja</option>
+                    <option value="medium">Media</option>
+                    <option value="high">Alta</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="estimatedEffort" className="block text-sm font-medium text-gray-700 mb-2">
+                    Esfuerzo Estimado
+                  </label>
+                  <input
+                    type="text"
+                    id="estimatedEffort"
+                    value={estimatedEffort}
+                    onChange={(e) => setEstimatedEffort(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Ej: 2 semanas, 40 horas"
+                  />
                 </div>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* Panel lateral */}
-        <div className="space-y-6">
-          {/* Información */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="h-5 w-5 text-blue-600" />
-              <h3 className="font-semibold text-blue-900">Análisis con IA</h3>
-            </div>
-            <p className="text-blue-800 text-sm mb-4">
-              Una vez creado, nuestro sistema analizará automáticamente tu caso de uso para:
-            </p>
-            <ul className="text-blue-800 text-sm space-y-2">
-              <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-blue-600" />
-                Identificar entidades clave
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-blue-600" />
-                Sugerir dominios BIAN
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-blue-600" />
-                Recomendar APIs relevantes
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-blue-600" />
-                Evaluar complejidad
-              </li>
-            </ul>
           </div>
 
-          {/* Ejemplos */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Ejemplos de Casos de Uso</h3>
-            <div className="space-y-4">
-              {exampleUseCases.map((example, index) => (
-                <div key={index} className="border rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">{example.title}</h4>
-                  <p className="text-sm text-gray-600 mb-3">{example.description}</p>
+          {/* Actores */}
+          <div className="bg-white shadow-sm rounded-lg p-6">
+            <div className="flex items-center mb-6">
+              <Users className="h-5 w-5 text-blue-600 mr-2" />
+              <h2 className="text-xl font-semibold text-gray-900">Actores</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Actores Primarios */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Actores Primarios
+                </label>
+                {primaryActors.map((actor, index) => (
+                  <div key={index} className="flex mb-2">
+                    <input
+                      type="text"
+                      value={actor}
+                      onChange={(e) => updateArrayItem(primaryActors, setPrimaryActors, index, e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ej: Cliente, Ejecutivo de cuenta"
+                    />
+                    {primaryActors.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeFromArray(primaryActors, setPrimaryActors, index)}
+                        className="ml-2 p-2 text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addToArray(primaryActors, setPrimaryActors)}
+                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Agregar actor primario
+                </button>
+              </div>
+
+              {/* Actores Secundarios */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Actores Secundarios
+                </label>
+                {secondaryActors.map((actor, index) => (
+                  <div key={index} className="flex mb-2">
+                    <input
+                      type="text"
+                      value={actor}
+                      onChange={(e) => updateArrayItem(secondaryActors, setSecondaryActors, index, e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ej: Supervisor, Auditor"
+                    />
+                    {secondaryActors.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeFromArray(secondaryActors, setSecondaryActors, index)}
+                        className="ml-2 p-2 text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addToArray(secondaryActors, setSecondaryActors)}
+                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Agregar actor secundario
+                </button>
+              </div>
+
+              {/* Sistemas */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Sistemas Involucrados
+                </label>
+                {systemActors.map((system, index) => (
+                  <div key={index} className="flex mb-2">
+                    <input
+                      type="text"
+                      value={system}
+                      onChange={(e) => updateArrayItem(systemActors, setSystemActors, index, e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ej: Core Banking, CRM, Sistema de Riesgo"
+                    />
+                    {systemActors.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeFromArray(systemActors, setSystemActors, index)}
+                        className="ml-2 p-2 text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addToArray(systemActors, setSystemActors)}
+                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Agregar sistema
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Prerrequisitos */}
+          <div className="bg-white shadow-sm rounded-lg p-6">
+            <div className="flex items-center mb-6">
+              <CheckSquare className="h-5 w-5 text-blue-600 mr-2" />
+              <h2 className="text-xl font-semibold text-gray-900">Prerrequisitos</h2>
+            </div>
+            
+            {prerequisites.map((prereq, index) => (
+              <div key={index} className="flex mb-2">
+                <input
+                  type="text"
+                  value={prereq}
+                  onChange={(e) => updateArrayItem(prerequisites, setPrerequisites, index, e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ej: Cliente debe estar autenticado, Cuenta debe existir"
+                />
+                {prerequisites.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => loadExample(example)}
-                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    onClick={() => removeFromArray(prerequisites, setPrerequisites, index)}
+                    className="ml-2 p-2 text-red-600 hover:text-red-800"
                   >
-                    Usar este ejemplo
+                    <Trash2 className="h-4 w-4" />
                   </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => addToArray(prerequisites, setPrerequisites)}
+              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Agregar prerrequisito
+            </button>
+          </div>
+
+          {/* Flujo Principal */}
+          <div className="bg-white shadow-sm rounded-lg p-6">
+            <div className="flex items-center mb-6">
+              <GitBranch className="h-5 w-5 text-blue-600 mr-2" />
+              <h2 className="text-xl font-semibold text-gray-900">Flujo Principal</h2>
+            </div>
+            
+            {mainFlow.map((step, index) => (
+              <div key={index} className="grid grid-cols-12 gap-4 mb-4 p-4 border border-gray-200 rounded-lg">
+                <div className="col-span-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Paso</label>
+                  <input
+                    type="number"
+                    value={step.step}
+                    onChange={(e) => updateMainFlowStep(index, 'step', parseInt(e.target.value))}
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    min="1"
+                  />
                 </div>
-              ))}
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Actor</label>
+                  <input
+                    type="text"
+                    value={step.actor}
+                    onChange={(e) => updateMainFlowStep(index, 'actor', e.target.value)}
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    placeholder="Cliente"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Acción</label>
+                  <input
+                    type="text"
+                    value={step.action}
+                    onChange={(e) => updateMainFlowStep(index, 'action', e.target.value)}
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    placeholder="Solicita"
+                  />
+                </div>
+                <div className="col-span-6">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Descripción</label>
+                  <input
+                    type="text"
+                    value={step.description}
+                    onChange={(e) => updateMainFlowStep(index, 'description', e.target.value)}
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    placeholder="Descripción detallada del paso"
+                  />
+                </div>
+                <div className="col-span-1 flex items-end">
+                  {mainFlow.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeMainFlowStep(index)}
+                      className="p-1 text-red-600 hover:text-red-800"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addMainFlowStep}
+              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Agregar paso
+            </button>
+          </div>
+
+          {/* Postcondiciones */}
+          <div className="bg-white shadow-sm rounded-lg p-6">
+            <div className="flex items-center mb-6">
+              <Target className="h-5 w-5 text-blue-600 mr-2" />
+              <h2 className="text-xl font-semibold text-gray-900">Postcondiciones</h2>
+            </div>
+            
+            {postconditions.map((postcond, index) => (
+              <div key={index} className="flex mb-2">
+                <input
+                  type="text"
+                  value={postcond}
+                  onChange={(e) => updateArrayItem(postconditions, setPostconditions, index, e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ej: Cuenta creada exitosamente, Cliente notificado"
+                />
+                {postconditions.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeFromArray(postconditions, setPostconditions, index)}
+                    className="ml-2 p-2 text-red-600 hover:text-red-800"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => addToArray(postconditions, setPostconditions)}
+              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Agregar postcondición
+            </button>
+          </div>
+
+          {/* Reglas de Negocio */}
+          <div className="bg-white shadow-sm rounded-lg p-6">
+            <div className="flex items-center mb-6">
+              <Shield className="h-5 w-5 text-blue-600 mr-2" />
+              <h2 className="text-xl font-semibold text-gray-900">Reglas de Negocio y Restricciones</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Reglas de Negocio */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reglas de Negocio
+                </label>
+                {businessRules.map((rule, index) => (
+                  <div key={index} className="flex mb-2">
+                    <input
+                      type="text"
+                      value={rule}
+                      onChange={(e) => updateArrayItem(businessRules, setBusinessRules, index, e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ej: Monto mínimo $1000"
+                    />
+                    {businessRules.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeFromArray(businessRules, setBusinessRules, index)}
+                        className="ml-2 p-2 text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addToArray(businessRules, setBusinessRules)}
+                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Agregar regla
+                </button>
+              </div>
+
+              {/* Supuestos */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Supuestos
+                </label>
+                {assumptions.map((assumption, index) => (
+                  <div key={index} className="flex mb-2">
+                    <input
+                      type="text"
+                      value={assumption}
+                      onChange={(e) => updateArrayItem(assumptions, setAssumptions, index, e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ej: Sistema disponible 24/7"
+                    />
+                    {assumptions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeFromArray(assumptions, setAssumptions, index)}
+                        className="ml-2 p-2 text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addToArray(assumptions, setAssumptions)}
+                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Agregar supuesto
+                </button>
+              </div>
+
+              {/* Restricciones */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Restricciones
+                </label>
+                {constraints.map((constraint, index) => (
+                  <div key={index} className="flex mb-2">
+                    <input
+                      type="text"
+                      value={constraint}
+                      onChange={(e) => updateArrayItem(constraints, setConstraints, index, e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ej: Solo horario bancario"
+                    />
+                    {constraints.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeFromArray(constraints, setConstraints, index)}
+                        className="ml-2 p-2 text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addToArray(constraints, setConstraints)}
+                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Agregar restricción
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Consejos */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Consejos para un Mejor Análisis</h3>
-            <ul className="text-sm text-gray-600 space-y-2">
-              <li>• Incluye actores involucrados (clientes, empleados, sistemas)</li>
-              <li>• Describe el flujo de procesos paso a paso</li>
-              <li>• Menciona requisitos regulatorios específicos</li>
-              <li>• Incluye integraciones con sistemas externos</li>
-              <li>• Especifica datos y documentos necesarios</li>
-            </ul>
+          {/* Requisitos No Funcionales */}
+          <div className="bg-white shadow-sm rounded-lg p-6">
+            <div className="flex items-center mb-6">
+              <Clock className="h-5 w-5 text-blue-600 mr-2" />
+              <h2 className="text-xl font-semibold text-gray-900">Requisitos No Funcionales</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label htmlFor="performance" className="block text-sm font-medium text-gray-700 mb-2">
+                  Rendimiento
+                </label>
+                <input
+                  type="text"
+                  id="performance"
+                  value={performance}
+                  onChange={(e) => setPerformance(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ej: Respuesta < 2 segundos"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="security" className="block text-sm font-medium text-gray-700 mb-2">
+                  Seguridad
+                </label>
+                <input
+                  type="text"
+                  id="security"
+                  value={security}
+                  onChange={(e) => setSecurity(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ej: Encriptación SSL, Autenticación 2FA"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="usability" className="block text-sm font-medium text-gray-700 mb-2">
+                  Usabilidad
+                </label>
+                <input
+                  type="text"
+                  id="usability"
+                  value={usability}
+                  onChange={(e) => setUsability(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ej: Interfaz intuitiva, máximo 3 clics"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="availability" className="block text-sm font-medium text-gray-700 mb-2">
+                  Disponibilidad
+                </label>
+                <input
+                  type="text"
+                  id="availability"
+                  value={availability}
+                  onChange={(e) => setAvailability(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ej: 99.9% uptime, 24/7"
+                />
+              </div>
+            </div>
           </div>
-        </div>
+
+          {/* Botones */}
+          <div className="flex justify-end space-x-4 pt-6">
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard')}
+              className="px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleAnalyzeWithAI}
+              disabled={isAnalyzing}
+              className="px-6 py-3 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              {isAnalyzing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Analizando...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Analizar con IA
+                </>
+              )}
+            </button>
+            <button
+              type="submit"
+              disabled={createMutation.isPending}
+              className="px-6 py-3 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              {createMutation.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Creando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Guardar Caso de Uso
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+
+        {/* Modal de Sugerencias de Contenido AI */}
+        {showContentSuggestions && contentSuggestions && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center">
+                    <Sparkles className="h-6 w-6 text-purple-600 mr-3" />
+                    <h3 className="text-xl font-semibold text-gray-900">Sugerencias de Contenido AI</h3>
+                  </div>
+                  <button
+                    onClick={() => setShowContentSuggestions(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <XCircle className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Información Básica Sugerida */}
+                  <div className="grid grid-cols-1 gap-6">
+                    {contentSuggestions.suggestedTitle && (
+                      <div className="border border-gray-200 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-900 mb-2">Título Sugerido</h4>
+                        <p className="text-sm text-gray-600 mb-2">Actual: {title}</p>
+                        <p className="text-sm text-green-600 font-medium">Sugerido: {contentSuggestions.suggestedTitle}</p>
+                      </div>
+                    )}
+
+                    {contentSuggestions.suggestedDescription && (
+                      <div className="border border-gray-200 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-900 mb-2">Descripción Sugerida</h4>
+                        <p className="text-sm text-gray-600 mb-2">Actual: {description || 'No especificada'}</p>
+                        <p className="text-sm text-green-600">{contentSuggestions.suggestedDescription}</p>
+                      </div>
+                    )}
+
+                    {contentSuggestions.suggestedObjective && (
+                      <div className="border border-gray-200 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-900 mb-2">Objetivo Sugerido</h4>
+                        <p className="text-sm text-gray-600 mb-2">Actual: {objective || 'No especificado'}</p>
+                        <p className="text-sm text-green-600">{contentSuggestions.suggestedObjective}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actores Sugeridos */}
+                  {contentSuggestions.suggestedActors && (
+                    <div className="border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">Actores Sugeridos</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {contentSuggestions.suggestedActors.primary && (
+                          <div>
+                            <h5 className="text-sm font-medium text-gray-700 mb-2">Primarios</h5>
+                            <ul className="text-sm text-green-600 space-y-1">
+                              {contentSuggestions.suggestedActors.primary.map((actor: string, index: number) => (
+                                <li key={index}>• {actor}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {contentSuggestions.suggestedActors.secondary && (
+                          <div>
+                            <h5 className="text-sm font-medium text-gray-700 mb-2">Secundarios</h5>
+                            <ul className="text-sm text-green-600 space-y-1">
+                              {contentSuggestions.suggestedActors.secondary.map((actor: string, index: number) => (
+                                <li key={index}>• {actor}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {contentSuggestions.suggestedActors.systems && (
+                          <div>
+                            <h5 className="text-sm font-medium text-gray-700 mb-2">Sistemas</h5>
+                            <ul className="text-sm text-green-600 space-y-1">
+                              {contentSuggestions.suggestedActors.systems.map((system: string, index: number) => (
+                                <li key={index}>• {system}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Prerrequisitos Sugeridos */}
+                  {contentSuggestions.suggestedPrerequisites && contentSuggestions.suggestedPrerequisites.length > 0 && (
+                    <div className="border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">Prerrequisitos Sugeridos</h4>
+                      <ul className="text-sm text-green-600 space-y-1">
+                        {contentSuggestions.suggestedPrerequisites.map((prereq: string, index: number) => (
+                          <li key={index}>• {prereq}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Flujo Principal Sugerido */}
+                  {contentSuggestions.suggestedMainFlow && contentSuggestions.suggestedMainFlow.length > 0 && (
+                    <div className="border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">Flujo Principal Sugerido</h4>
+                      <div className="space-y-2">
+                        {contentSuggestions.suggestedMainFlow.map((step: any, index: number) => (
+                          <div key={index} className="text-sm">
+                            <span className="font-medium text-gray-700">{step.step}. {step.actor}:</span>
+                            <span className="text-green-600 ml-2">{step.action} - {step.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Postcondiciones Sugeridas */}
+                  {contentSuggestions.suggestedPostconditions && contentSuggestions.suggestedPostconditions.length > 0 && (
+                    <div className="border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">Postcondiciones Sugeridas</h4>
+                      <ul className="text-sm text-green-600 space-y-1">
+                        {contentSuggestions.suggestedPostconditions.map((post: string, index: number) => (
+                          <li key={index}>• {post}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Reglas de Negocio Sugeridas */}
+                  {contentSuggestions.suggestedBusinessRules && contentSuggestions.suggestedBusinessRules.length > 0 && (
+                    <div className="border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">Reglas de Negocio Sugeridas</h4>
+                      <ul className="text-sm text-green-600 space-y-1">
+                        {contentSuggestions.suggestedBusinessRules.map((rule: string, index: number) => (
+                          <li key={index}>• {rule}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Nivel de Confianza */}
+                  {contentSuggestions.confidence && (
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-blue-900 mb-2">Nivel de Confianza</h4>
+                      <div className="flex items-center">
+                        <div className="flex-1 bg-blue-200 rounded-full h-2 mr-3">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full" 
+                            style={{ width: `${contentSuggestions.confidence * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm text-blue-800 font-medium">
+                          {Math.round(contentSuggestions.confidence * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Botones */}
+                <div className="flex justify-end space-x-4 mt-6 pt-6 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowContentSuggestions(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Rechazar Sugerencias
+                  </button>
+                  <button
+                    onClick={applyContentSuggestions}
+                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 flex items-center"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Aplicar Sugerencias
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Sugerencias IA */}
+        {showAiAnalysis && aiSuggestions && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center">
+                    <Sparkles className="h-6 w-6 text-purple-600 mr-3" />
+                    <h3 className="text-xl font-semibold text-gray-900">Sugerencias de IA</h3>
+                  </div>
+                  <button
+                    onClick={() => setShowAiAnalysis(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <XCircle className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Análisis General */}
+                  {aiSuggestions.analysis && (
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-blue-900 mb-2">Análisis General</h4>
+                      <p className="text-blue-800">{aiSuggestions.analysis}</p>
+                    </div>
+                  )}
+
+                  {/* Mejoras Sugeridas */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {aiSuggestions.improvedTitle && (
+                      <div className="border border-gray-200 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-900 mb-2">Título Mejorado</h4>
+                        <p className="text-sm text-gray-600 mb-2">Actual: {title}</p>
+                        <p className="text-sm text-green-600">Sugerido: {aiSuggestions.improvedTitle}</p>
+                      </div>
+                    )}
+
+                    {aiSuggestions.improvedDescription && (
+                      <div className="border border-gray-200 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-900 mb-2">Descripción Mejorada</h4>
+                        <p className="text-sm text-gray-600 mb-2">Actual: {description}</p>
+                        <p className="text-sm text-green-600">Sugerido: {aiSuggestions.improvedDescription}</p>
+                      </div>
+                    )}
+
+                    {aiSuggestions.improvedObjective && (
+                      <div className="border border-gray-200 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-900 mb-2">Objetivo Mejorado</h4>
+                        <p className="text-sm text-gray-600 mb-2">Actual: {objective}</p>
+                        <p className="text-sm text-green-600">Sugerido: {aiSuggestions.improvedObjective}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sugerencias Adicionales */}
+                  {aiSuggestions.suggestedActors && (
+                    <div className="border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">Actores Sugeridos</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {aiSuggestions.suggestedActors.primary && (
+                          <div>
+                            <h5 className="text-sm font-medium text-gray-700 mb-2">Primarios</h5>
+                            <ul className="text-sm text-green-600 space-y-1">
+                              {aiSuggestions.suggestedActors.primary.map((actor: string, index: number) => (
+                                <li key={index}>• {actor}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {aiSuggestions.suggestedActors.secondary && (
+                          <div>
+                            <h5 className="text-sm font-medium text-gray-700 mb-2">Secundarios</h5>
+                            <ul className="text-sm text-green-600 space-y-1">
+                              {aiSuggestions.suggestedActors.secondary.map((actor: string, index: number) => (
+                                <li key={index}>• {actor}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {aiSuggestions.suggestedActors.systems && (
+                          <div>
+                            <h5 className="text-sm font-medium text-gray-700 mb-2">Sistemas</h5>
+                            <ul className="text-sm text-green-600 space-y-1">
+                              {aiSuggestions.suggestedActors.systems.map((system: string, index: number) => (
+                                <li key={index}>• {system}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recomendaciones */}
+                  {aiSuggestions.recommendations && (
+                    <div className="bg-yellow-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-yellow-900 mb-2">Recomendaciones</h4>
+                      <ul className="text-sm text-yellow-800 space-y-1">
+                        {aiSuggestions.recommendations.map((rec: string, index: number) => (
+                          <li key={index}>• {rec}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Botones */}
+                <div className="flex justify-end space-x-4 mt-6 pt-6 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowAiAnalysis(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Rechazar Sugerencias
+                  </button>
+                  <button
+                    onClick={applySuggestions}
+                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 flex items-center"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Aplicar Sugerencias
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

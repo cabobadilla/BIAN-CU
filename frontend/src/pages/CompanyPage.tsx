@@ -233,7 +233,7 @@ const CompanyPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-600 mb-1">
                     Total de usuarios
                   </label>
-                  <p className="text-gray-900">{company.users.length} usuarios</p>
+                  <p className="text-gray-900">{users.length} usuarios</p>
                 </div>
               </div>
 

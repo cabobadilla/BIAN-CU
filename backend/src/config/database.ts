@@ -14,7 +14,6 @@ export const connectDB = async (): Promise<void> => {
       maxPoolSize: 10, // Mantener hasta 10 conexiones socket
       serverSelectionTimeoutMS: 5000, // Mantener intentando enviar operaciones por 5 segundos
       socketTimeoutMS: 45000, // Cerrar sockets después de 45 segundos de inactividad
-      bufferMaxEntries: 0, // Deshabilitar mongoose buffering
       bufferCommands: false, // Deshabilitar mongoose buffering
     });
 

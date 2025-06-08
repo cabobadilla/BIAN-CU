@@ -9,22 +9,30 @@ import { logger } from '../utils/logger';
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID!,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-  callbackURL: '/api/v1/auth/google/callback'
+  callbackURL: `${process.env.API_URL}/api/v1/auth/google/callback`
 }, async (accessToken, refreshToken, profile, done) => {
   try {
+    logger.info('=== INICIO GOOGLE OAUTH STRATEGY ===');
+    logger.info(`Profile recibido: ${JSON.stringify(profile, null, 2)}`);
+    
     const email = profile.emails?.[0]?.value;
     const googleId = profile.id;
     const name = profile.displayName;
     const picture = profile.photos?.[0]?.value;
 
+    logger.info(`Datos extraídos - Email: ${email}, GoogleId: ${googleId}, Name: ${name}`);
+
     if (!email) {
-      return done(new Error('No se pudo obtener el email del perfil de Google'), null);
+      logger.error('No se pudo obtener email del perfil de Google');
+      return done(new Error('No se pudo obtener el email del perfil de Google'), false);
     }
 
     // Buscar usuario existente
-    let user = await User.findByGoogleId(googleId);
+    logger.info(`Buscando usuario existente por googleId: ${googleId}`);
+    let user = await User.findOne({ googleId, isActive: true });
     
     if (user) {
+      logger.info(`Usuario encontrado por googleId: ${user.email}`);
       // Actualizar último login
       user.lastLogin = new Date();
       await user.save();
@@ -32,9 +40,11 @@ passport.use(new GoogleStrategy({
     }
 
     // Si no existe, buscar por email
-    user = await User.findByEmail(email);
+    logger.info(`Usuario no encontrado por googleId, buscando por email: ${email.toLowerCase()}`);
+    user = await User.findOne({ email: email.toLowerCase(), isActive: true });
     
     if (user) {
+      logger.info(`Usuario encontrado por email: ${user.email}, vinculando cuenta de Google`);
       // Vincular cuenta de Google existente
       user.googleId = googleId;
       user.picture = picture;
@@ -43,9 +53,21 @@ passport.use(new GoogleStrategy({
       return done(null, user);
     }
 
+    logger.info('Usuario no encontrado, procediendo a crear nuevo usuario y empresa');
+
     // Determinar empresa basada en dominio del email
     const emailDomain = email.split('@')[1];
-    let company = await Company.findByDomain(emailDomain);
+    logger.info(`Buscando empresa para dominio: ${emailDomain}`);
+    
+    let company = await Company.findOne({ 
+      $or: [
+        { domain: emailDomain.toLowerCase() },
+        { 'settings.allowedDomains': emailDomain.toLowerCase() }
+      ],
+      isActive: true 
+    });
+    
+    logger.info(`Empresa encontrada: ${company ? company.name : 'No encontrada'}`);
 
     if (!company) {
       // Crear empresa automáticamente para dominios no registrados
@@ -58,29 +80,38 @@ passport.use(new GoogleStrategy({
           features: ['use-cases', 'bian-analysis', 'api-generation']
         }
       });
-      await company.save();
-      logger.info(`Nueva empresa creada automáticamente: ${company.name}`);
+      const savedCompany = await company.save();
+      logger.info(`Nueva empresa creada automáticamente: ${company.name} con ID: ${company._id}`);
+      logger.info(`Empresa guardada, ID verificado: ${savedCompany._id}, tipo: ${typeof savedCompany._id}`);
+    }
+
+    // Verificar que la empresa tiene un ID válido
+    if (!company._id) {
+      throw new Error('No se pudo obtener el ID de la empresa');
     }
 
     // Crear nuevo usuario
+    logger.info(`Creando usuario con companyId: ${company._id}, tipo: ${typeof company._id}`);
+    
     user = new User({
       googleId,
       email,
       name,
       picture,
       companyId: company._id,
-      role: 'user',
+      role: 'admin', // Primer usuario de la empresa es admin
       lastLogin: new Date()
     });
 
+    logger.info(`Usuario creado en memoria, validando...`);
     await user.save();
-    logger.info(`Nuevo usuario registrado: ${email}`);
+    logger.info(`Nuevo usuario registrado: ${email} en empresa: ${company._id}`);
     
     return done(null, user);
 
   } catch (error) {
     logger.error('Error en Google OAuth Strategy:', error);
-    return done(error, null);
+    return done(error, false);
   }
 }));
 

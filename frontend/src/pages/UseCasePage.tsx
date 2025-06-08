@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -15,7 +15,8 @@ import {
   CheckCircle,
   AlertCircle,
   FileText,
-  Settings
+  Settings,
+  MoreVertical
 } from 'lucide-react';
 import { useCaseService, bianService } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -26,9 +27,11 @@ const UseCasePage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'domains' | 'apis' | 'schemas' | 'datasources'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'domains' | 'apis'>('overview');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ title: '', description: '' });
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Consultar caso de uso
   const { data: useCaseResponse, isLoading: useCaseLoading } = useQuery({
@@ -45,6 +48,24 @@ const UseCasePage: React.FC = () => {
 
   const useCase: UseCase = useCaseResponse?.data?.data as UseCase;
   const domains: BianDomain[] = (domainsResponse?.data?.data as BianDomain[]) || [];
+
+  // Cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (showDropdown && !target.closest('.dropdown-container')) {
+        setShowDropdown(false);
+      }
+    };
+
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDropdown]);
 
   // Mutaciones
   const updateUseCaseMutation = useMutation({
@@ -66,6 +87,21 @@ const UseCasePage: React.FC = () => {
     mutationFn: (apis: string[]) => useCaseService.selectApis(id!, apis),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['useCase', id] });
+    },
+  });
+
+  const deleteUseCaseMutation = useMutation({
+    mutationFn: () => {
+      console.log('Ejecutando eliminación para ID:', id);
+      return useCaseService.delete(id!);
+    },
+    onSuccess: () => {
+      console.log('Caso de uso eliminado exitosamente');
+      navigate('/dashboard');
+    },
+    onError: (error) => {
+      console.error('Error eliminando caso de uso:', error);
+      alert('Error al eliminar el caso de uso. Por favor intenta de nuevo.');
     },
   });
 
@@ -98,6 +134,22 @@ const UseCasePage: React.FC = () => {
   const handleCancel = () => {
     setIsEditing(false);
     setEditForm({ title: '', description: '' });
+  };
+
+  const handleDelete = () => {
+    console.log('handleDelete called');
+    setShowDropdown(false);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    console.log('confirmDelete called');
+    deleteUseCaseMutation.mutate();
+  };
+
+  const cancelDelete = () => {
+    console.log('cancelDelete called');
+    setShowDeleteConfirm(false);
   };
 
   const getStatusColor = (status: UseCase['status']) => {
@@ -138,8 +190,6 @@ const UseCasePage: React.FC = () => {
     { id: 'overview', label: 'Resumen', icon: FileText },
     { id: 'domains', label: 'Dominios BIAN', icon: Building2 },
     { id: 'apis', label: 'APIs', icon: Code },
-    { id: 'schemas', label: 'Schemas', icon: Settings },
-    { id: 'datasources', label: 'Fuentes de Datos', icon: Database },
   ];
 
   return (
@@ -200,13 +250,44 @@ const UseCasePage: React.FC = () => {
               </button>
             </div>
           ) : (
-            <button
-              onClick={handleEdit}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2"
-            >
-              <Edit3 className="h-4 w-4" />
-              Editar
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleEdit}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2"
+              >
+                <Edit3 className="h-4 w-4" />
+                Editar
+              </button>
+              <div className="relative dropdown-container">
+                <button
+                  onClick={() => {
+                    console.log('Dropdown button clicked, current state:', showDropdown);
+                    setShowDropdown(!showDropdown);
+                  }}
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-lg flex items-center"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+                {showDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                    <div className="py-1">
+                      <button
+                        onClick={(e) => {
+                          console.log('Delete button clicked');
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDelete();
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Eliminar caso de uso
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -219,7 +300,7 @@ const UseCasePage: React.FC = () => {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as 'overview' | 'domains' | 'apis' | 'schemas' | 'datasources')}
+                onClick={() => setActiveTab(tab.id as 'overview' | 'domains' | 'apis')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'
@@ -252,9 +333,40 @@ const UseCasePage: React.FC = () => {
             isLoading={selectApisMutation.isPending}
           />
         )}
-        {activeTab === 'schemas' && <SchemasTab useCase={useCase} />}
-        {activeTab === 'datasources' && <DataSourcesTab useCase={useCase} />}
+
       </div>
+
+      {/* Modal de confirmación para eliminar */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <AlertCircle className="h-6 w-6 text-red-600 mr-3" />
+              <h3 className="text-lg font-semibold text-gray-900">Confirmar eliminación</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              ¿Estás seguro de que quieres eliminar el caso de uso "{useCase.title}"? 
+              Esta acción no se puede deshacer y se perderán todos los datos asociados.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelDelete}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleteUseCaseMutation.isPending}
+                className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg flex items-center gap-2 disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                {deleteUseCaseMutation.isPending ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -280,7 +392,7 @@ const OverviewTab: React.FC<{ useCase: UseCase }> = ({ useCase }) => {
           <div className="space-y-3">
             <div>
               <label className="text-sm font-medium text-gray-600">Creado por</label>
-              <p className="text-gray-900">{useCase.createdBy.name}</p>
+              <p className="text-gray-900">{useCase.createdBy?.name || 'Usuario desconocido'}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600">Fecha de creación</label>
@@ -305,12 +417,8 @@ const OverviewTab: React.FC<{ useCase: UseCase }> = ({ useCase }) => {
               <p className="text-gray-900">{useCase.selectedApis.length} APIs</p>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-600">Schemas personalizados</label>
-              <p className="text-gray-900">{useCase.customSchemas.length} schemas</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600">Fuentes de datos</label>
-              <p className="text-gray-900">{useCase.dataSources.length} fuentes</p>
+              <label className="text-sm font-medium text-gray-600">Estado</label>
+              <p className="text-gray-900">{useCase.status}</p>
             </div>
           </div>
         </div>
@@ -575,15 +683,58 @@ const ApisTab: React.FC<{
                   <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
                     {api.operationType}
                   </span>
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                  <span className={`text-xs px-2 py-1 rounded font-medium ${
+                    api.method === 'GET' ? 'bg-green-100 text-green-800' :
+                    api.method === 'POST' ? 'bg-blue-100 text-blue-800' :
+                    api.method === 'PUT' ? 'bg-yellow-100 text-yellow-800' :
+                    api.method === 'DELETE' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
                     {api.method}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 mb-2">{api.description}</p>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500 mb-2">
                   <span className="font-medium">Dominio:</span> {api.domain} | 
-                  <span className="font-medium"> Endpoint:</span> {api.endpoint}
+                  <span className="font-medium"> Endpoint:</span> <code className="bg-gray-100 px-1 rounded">{api.endpoint}</code>
                 </div>
+                
+                {/* Mostrar métodos disponibles si hay más de uno */}
+                {api.availableMethods && api.availableMethods.length > 1 && (
+                  <div className="text-xs text-gray-500">
+                    <span className="font-medium">Métodos disponibles:</span>
+                    <div className="flex gap-1 mt-1">
+                      {api.availableMethods.map((method, idx) => (
+                        <span key={idx} className={`px-2 py-1 rounded text-xs ${
+                          method === 'GET' ? 'bg-green-100 text-green-700' :
+                          method === 'POST' ? 'bg-blue-100 text-blue-700' :
+                          method === 'PUT' ? 'bg-yellow-100 text-yellow-700' :
+                          method === 'DELETE' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {method}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Mostrar parámetros si están disponibles */}
+                {api.parameters && api.parameters.length > 0 && (
+                  <div className="text-xs text-gray-500 mt-2">
+                    <span className="font-medium">Parámetros:</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {api.parameters.slice(0, 3).map((param, idx) => (
+                        <span key={idx} className="bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                          {param.name} ({param.type})
+                        </span>
+                      ))}
+                      {api.parameters.length > 3 && (
+                        <span className="text-gray-500">+{api.parameters.length - 3} más</span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               {selectedApis.includes(api.name) && (
                 <CheckCircle className="h-5 w-5 text-blue-600 ml-2" />
@@ -604,121 +755,6 @@ const ApisTab: React.FC<{
   );
 };
 
-// Componente Schemas Tab
-const SchemasTab: React.FC<{ useCase: UseCase }> = ({ useCase }) => {
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-900">Schemas Personalizados</h3>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Nuevo Schema
-        </button>
-      </div>
 
-      {useCase.customSchemas.length === 0 ? (
-        <div className="text-center py-8">
-          <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay schemas personalizados</h3>
-          <p className="text-gray-600 mb-4">Crea schemas personalizados para complementar las APIs BIAN.</p>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
-            Crear primer schema
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {useCase.customSchemas.map((schema, index) => (
-            <div key={index} className="border rounded-lg p-4">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <h4 className="font-medium text-gray-900">{schema.name}</h4>
-                  <p className="text-sm text-gray-600">{schema.description}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-1 rounded ${
-                    schema.generatedBy === 'ai' 
-                      ? 'bg-blue-100 text-blue-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {schema.generatedBy === 'ai' ? 'Generado por IA' : 'Manual'}
-                  </span>
-                  <button className="text-gray-400 hover:text-red-600">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="bg-gray-50 p-3 rounded text-sm">
-                <pre className="text-gray-700 overflow-x-auto">
-                  {JSON.stringify(schema.schema, null, 2)}
-                </pre>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Componente DataSources Tab
-const DataSourcesTab: React.FC<{ useCase: UseCase }> = ({ useCase }) => {
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-900">Fuentes de Datos</h3>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Nueva Fuente
-        </button>
-      </div>
-
-      {useCase.dataSources.length === 0 ? (
-        <div className="text-center py-8">
-          <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay fuentes de datos</h3>
-          <p className="text-gray-600 mb-4">Conecta fuentes de datos externas para enriquecer tu caso de uso.</p>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
-            Agregar primera fuente
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {useCase.dataSources.map((dataSource, index) => (
-            <div key={index} className="border rounded-lg p-4">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <h4 className="font-medium text-gray-900">{dataSource.name}</h4>
-                  <p className="text-sm text-gray-600">Tipo: {dataSource.type}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
-                    dataSource.isValidated 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {dataSource.isValidated ? (
-                      <CheckCircle className="h-3 w-3" />
-                    ) : (
-                      <AlertCircle className="h-3 w-3" />
-                    )}
-                    {dataSource.isValidated ? 'Validado' : 'No validado'}
-                  </span>
-                  <button className="text-gray-400 hover:text-red-600">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              {dataSource.connection.apiUrl && (
-                <div className="text-sm text-gray-600">
-                  <span className="font-medium">URL:</span> {dataSource.connection.apiUrl}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
 export default UseCasePage; 
