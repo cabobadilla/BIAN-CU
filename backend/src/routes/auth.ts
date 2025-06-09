@@ -36,62 +36,72 @@ router.get('/google',
  */
 router.get('/google/callback',
   (req: Request, res: Response, next: any) => {
-    logger.info('=== GOOGLE CALLBACK START ===');
-    logger.info(`Callback URL: ${req.url}`);
-    logger.info(`Query params: ${JSON.stringify(req.query)}`);
+    logger.info('=== GOOGLE OAUTH CALLBACK INICIADO ===');
+    logger.info('Query params:', req.query);
+    logger.info('Session before auth:', req.session);
     
     passport.authenticate('google', (err: any, user: any, info: any) => {
-      logger.info('=== PASSPORT AUTHENTICATE RESULT ===');
-      logger.info(`Error: ${err ? JSON.stringify(err) : 'null'}`);
-      logger.info(`User: ${user ? JSON.stringify({id: user._id, email: user.email}) : 'null'}`);
-      logger.info(`Info: ${info ? JSON.stringify(info) : 'null'}`);
+      logger.info('=== PASSPORT AUTHENTICATE CALLBACK ===');
+      logger.info('Error:', err);
+      logger.info('User:', user);
+      logger.info('Info:', info);
+      logger.info('Session after auth:', req.session);
       
       if (err) {
-        logger.error('Error en autenticación Google:', err);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        logger.info(`Redirecting to: ${frontendUrl}/login?error=auth_failed`);
-        return res.redirect(`${frontendUrl}/login?error=auth_failed`);
+        logger.error('Error en autenticación:', err);
+        const redirectUrl = `${process.env.FRONTEND_URL}/login?error=auth_failed&reason=passport_error`;
+        logger.info('Redirecting to (error):', redirectUrl);
+        return res.redirect(redirectUrl);
       }
       
       if (!user) {
-        logger.error('No se obtuvo usuario de Google:', info);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        logger.info(`Redirecting to: ${frontendUrl}/login?error=no_user`);
-        return res.redirect(`${frontendUrl}/login?error=no_user`);
+        logger.error('No se encontró usuario después de autenticación');
+        const redirectUrl = `${process.env.FRONTEND_URL}/login?error=auth_failed&reason=no_user`;
+        logger.info('Redirecting to (no user):', redirectUrl);
+        return res.redirect(redirectUrl);
       }
 
-      // Generar JWT token
       try {
-        logger.info('=== GENERATING JWT TOKEN ===');
+        logger.info('Generando token para usuario:', user.email);
         const token = jwt.sign(
           { 
-            sub: user._id,
+            userId: user._id, 
             email: user.email,
-            companyId: user.companyId,
-            role: user.role
+            companyId: user.companyId 
           },
-          process.env.JWT_SECRET!,
-          { 
-            expiresIn: '24h',
-            issuer: 'bian-cu-platform',
-            audience: 'bian-cu-users'
-          }
+          process.env.JWT_SECRET || 'fallback-secret',
+          { expiresIn: '7d' }
         );
-
-        logger.info(`Token generado exitosamente para usuario: ${user.email}`);
-
-        // Redirigir al frontend con el token
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const redirectUrl = `${frontendUrl}/auth/callback?token=${token}`;
-        logger.info(`Redirecting to: ${redirectUrl}`);
-        res.redirect(redirectUrl);
+        
+        logger.info('Token generado exitosamente');
+        
+        req.logIn(user, (loginErr) => {
+          if (loginErr) {
+            logger.error('Error en req.logIn:', loginErr);
+            const redirectUrl = `${process.env.FRONTEND_URL}/login?error=auth_failed&reason=login_error`;
+            logger.info('Redirecting to (login error):', redirectUrl);
+            return res.redirect(redirectUrl);
+          }
+          
+          logger.info('Usuario logueado en sesión exitosamente');
+          logger.info('Session after login:', req.session);
+          
+          const successUrl = `${process.env.FRONTEND_URL}/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify({
+            id: user._id,
+            email: user.email,
+            name: user.name,
+            companyId: user.companyId
+          }))}`;
+          
+          logger.info('SUCCESS! Redirecting to:', successUrl);
+          res.redirect(successUrl);
+        });
         
       } catch (tokenError) {
-        logger.error('Error generando token JWT:', tokenError);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const errorUrl = `${frontendUrl}/login?error=token_failed`;
-        logger.info(`Redirecting to: ${errorUrl}`);
-        res.redirect(errorUrl);
+        logger.error('Error generando token:', tokenError);
+        const redirectUrl = `${process.env.FRONTEND_URL}/login?error=auth_failed&reason=token_error`;
+        logger.info('Redirecting to (token error):', redirectUrl);
+        res.redirect(redirectUrl);
       }
     })(req, res, next);
   }
