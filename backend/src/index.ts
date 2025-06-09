@@ -14,6 +14,7 @@ import swaggerUi from 'swagger-ui-express';
 
 import { connectDB } from './config/database';
 import { logger } from './utils/logger';
+import { initializeDefaultData } from './utils/initialization';
 import { errorHandler } from './middleware/errorHandler';
 import { authRoutes } from './routes/auth';
 import { companyRoutes } from './routes/companies';
@@ -140,6 +141,9 @@ async function startServer() {
     if (process.env.MONGODB_URI && process.env.MONGODB_URI !== '...........') {
       await connectDB();
       logger.info('✅ MongoDB conectado');
+      
+      // Inicializar datos por defecto después de conectar MongoDB
+      await initializeDefaultData();
     } else {
       logger.warn('⚠️ MongoDB no configurado - algunas funciones pueden no funcionar');
     }
