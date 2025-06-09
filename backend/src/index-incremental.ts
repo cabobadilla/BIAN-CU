@@ -80,13 +80,18 @@ app.use(passport.initialize());
 app.use(passport.session());
 console.log('9. Passport basic setup completed');
 
+// PASO 3: Agregar estrategias OAuth
+console.log('10. Importing OAuth strategies...');
+import './config/passportConfig';
+console.log('11. OAuth strategies configured');
+
 // Ruta de health check
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'INCREMENTAL SERVER OK', 
     timestamp: new Date().toISOString(),
     version: '1.0.0',
-    step: 'Basic + Sessions + Passport'
+    step: 'Basic + Sessions + Passport + OAuth'
   });
 });
 
@@ -94,36 +99,36 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'INCREMENTAL SERVER RUNNING',
     timestamp: new Date().toISOString(),
-    step: 'Basic + Sessions + Passport'
+    step: 'Basic + Sessions + Passport + OAuth'
   });
 });
 
-console.log('10. Routes configured');
+console.log('12. Routes configured');
 
 // Inicializar servidor
 async function startServer() {
   try {
-    console.log('11. Starting server initialization...');
+    console.log('13. Starting server initialization...');
     
     // Solo conectar a MongoDB si está configurado
     if (process.env.MONGODB_URI && process.env.MONGODB_URI !== '...........') {
-      console.log('12. Connecting to MongoDB...');
+      console.log('14. Connecting to MongoDB...');
       await connectDB();
       logger.info('✅ MongoDB conectado');
       
-      console.log('13. Initializing default data...');
+      console.log('15. Initializing default data...');
       await initializeDefaultData();
       
-      console.log('14. MongoDB and initialization completed');
+      console.log('16. MongoDB and initialization completed');
     } else {
       logger.warn('⚠️ MongoDB no configurado');
     }
     
-    console.log('15. Starting HTTP server...');
+    console.log('17. Starting HTTP server...');
     app.listen(PORT, () => {
       logger.info(`🚀 Servidor INCREMENTAL ejecutándose en puerto ${PORT}`);
       console.log(`✅ INCREMENTAL Server running on port ${PORT}`);
-      console.log('16. Server started successfully');
+      console.log('18. Server started successfully');
     });
   } catch (error) {
     logger.error('Error al inicializar el servidor:', error);
@@ -132,5 +137,5 @@ async function startServer() {
   }
 }
 
-console.log('17. Calling startServer...');
+console.log('19. Calling startServer...');
 startServer(); 
