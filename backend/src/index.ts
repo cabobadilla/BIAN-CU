@@ -2,6 +2,11 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
+console.log('=== MAIN SERVER START ===');
+console.log('Environment:', process.env.NODE_ENV);
+console.log('MongoDB URI configured:', !!process.env.MONGODB_URI);
+console.log('Google OAuth configured:', !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET);
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
