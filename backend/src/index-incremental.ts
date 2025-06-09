@@ -85,13 +85,18 @@ console.log('10. Importing OAuth strategies...');
 import './config/passport';
 console.log('11. OAuth strategies configured');
 
+// PASO 4: Agregar rutas OAuth
+console.log('12. Importing auth routes...');
+import { authRoutes } from './routes/auth';
+console.log('13. Auth routes imported');
+
 // Ruta de health check
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'INCREMENTAL SERVER OK', 
     timestamp: new Date().toISOString(),
     version: '1.0.0',
-    step: 'Basic + Sessions + Passport + OAuth'
+    step: 'Basic + Sessions + Passport + OAuth + Routes'
   });
 });
 
@@ -99,36 +104,39 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'INCREMENTAL SERVER RUNNING',
     timestamp: new Date().toISOString(),
-    step: 'Basic + Sessions + Passport + OAuth'
+    step: 'Basic + Sessions + Passport + OAuth + Routes'
   });
 });
 
-console.log('12. Routes configured');
+// Configurar rutas OAuth
+app.use('/api/v1/auth', authRoutes);
+
+console.log('14. Routes configured');
 
 // Inicializar servidor
 async function startServer() {
   try {
-    console.log('13. Starting server initialization...');
+    console.log('15. Starting server initialization...');
     
     // Solo conectar a MongoDB si está configurado
     if (process.env.MONGODB_URI && process.env.MONGODB_URI !== '...........') {
-      console.log('14. Connecting to MongoDB...');
+      console.log('16. Connecting to MongoDB...');
       await connectDB();
       logger.info('✅ MongoDB conectado');
       
-      console.log('15. Initializing default data...');
+      console.log('17. Initializing default data...');
       await initializeDefaultData();
       
-      console.log('16. MongoDB and initialization completed');
+      console.log('18. MongoDB and initialization completed');
     } else {
       logger.warn('⚠️ MongoDB no configurado');
     }
     
-    console.log('17. Starting HTTP server...');
+    console.log('19. Starting HTTP server...');
     app.listen(PORT, () => {
       logger.info(`🚀 Servidor INCREMENTAL ejecutándose en puerto ${PORT}`);
       console.log(`✅ INCREMENTAL Server running on port ${PORT}`);
-      console.log('18. Server started successfully');
+      console.log('20. Server started successfully');
     });
   } catch (error) {
     logger.error('Error al inicializar el servidor:', error);
@@ -137,5 +145,5 @@ async function startServer() {
   }
 }
 
-console.log('19. Calling startServer...');
+console.log('21. Calling startServer...');
 startServer(); 
