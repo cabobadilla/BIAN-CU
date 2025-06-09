@@ -33,11 +33,13 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
       console.log('✅ Using real JWT token');
     } else {
-      // TEMPORAL: Agregar un token dummy para development/testing
-      console.warn('❌ No hay token de autenticación, usando token dummy para desarrollo');
-      config.headers.Authorization = `Bearer dummy-token-for-development`;
+      console.error('❌ NO TOKEN AVAILABLE - Request will fail with 401');
+      // NO agregar token dummy - dejar que falle para debugging
     }
-    console.log('Final Authorization header:', config.headers.Authorization?.substring(0, 30) + '...');
+    
+    const authHeader = config.headers.Authorization;
+    const headerDisplay = typeof authHeader === 'string' ? authHeader.substring(0, 30) + '...' : 'NONE';
+    console.log('Final Authorization header:', headerDisplay);
     console.log('==============================');
     
     return config;
