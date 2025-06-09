@@ -2,20 +2,28 @@ import OpenAI from 'openai';
 import { logger } from '../utils/logger';
 
 class OpenAIService {
-  private openai: OpenAI;
+  private openai: OpenAI | null = null;
 
   constructor() {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY no está configurada');
-    }
+    // No inicializar OpenAI en el constructor para evitar crash al importar
+  }
 
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+  private initializeOpenAI() {
+    if (!this.openai) {
+      if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === '...........') {
+        throw new Error('OPENAI_API_KEY no está configurada correctamente');
+      }
+
+      this.openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+    }
+    return this.openai;
   }
 
   async analyzeUseCase(originalText: string) {
     try {
+      const openai = this.initializeOpenAI();
       const prompt = `
 Analiza el siguiente caso de uso bancario y extrae la información estructurada:
 
@@ -43,7 +51,7 @@ Responde en formato JSON con la siguiente estructura:
 El campo confidence debe ser un número entre 0 y 1 indicando tu confianza en el análisis.
 `;
 
-      const completion = await this.openai.chat.completions.create({
+      const completion = await openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
         messages: [
           {
@@ -107,6 +115,7 @@ El campo confidence debe ser un número entre 0 y 1 indicando tu confianza en el
 
   async suggestBianDomains(useCaseText: string, existingAnalysis?: any) {
     try {
+      const openai = this.initializeOpenAI();
       const prompt = `
 Basándote en el siguiente caso de uso bancario, sugiere los dominios BIAN v13 más relevantes:
 
@@ -149,7 +158,7 @@ Responde con un JSON que contenga:
 }
 `;
 
-      const completion = await this.openai.chat.completions.create({
+      const completion = await openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
         messages: [
           {
@@ -190,6 +199,7 @@ Responde con un JSON que contenga:
 
   async generateCustomSchema(description: string, apiContext?: string) {
     try {
+      const openai = this.initializeOpenAI();
       const prompt = `
 Genera un schema JSON para el siguiente requerimiento:
 
@@ -198,26 +208,22 @@ ${description}
 
 ${apiContext ? `CONTEXTO DE API: ${apiContext}` : ''}
 
-Genera un schema JSON válido que incluya:
-1. Propiedades relevantes con tipos apropiados
-2. Validaciones necesarias (required, format, etc.)
-3. Descripciones para cada campo
-4. Ejemplos cuando sea apropiado
+Crea un schema JSON Schema (draft-07) que incluya:
+1. Propiedades relevantes para el caso de uso
+2. Tipos de datos apropiados
+3. Validaciones necesarias (required, pattern, etc.)
+4. Descripciones claras para cada campo
+5. Ejemplos cuando sea apropiado
 
-Responde con un JSON que contenga:
+Responde SOLO con un JSON válido que contenga:
 {
-  "schema": {
-    "type": "object",
-    "properties": { ... },
-    "required": [...],
-    "additionalProperties": false
-  },
-  "example": { ... },
+  "schema": { ... }, // El JSON Schema generado
+  "example": { ... }, // Un ejemplo de datos que cumplan el schema
   "description": "Descripción del schema generado"
 }
 `;
 
-      const completion = await this.openai.chat.completions.create({
+      const completion = await openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
         messages: [
           {
@@ -257,6 +263,7 @@ Responde con un JSON que contenga:
 
   async analyzeCaseForSuggestions(structuredText: string) {
     try {
+      const openai = this.initializeOpenAI();
       const prompt = `
 Analiza el siguiente caso de uso bancario y proporciona sugerencias de mejora:
 
@@ -294,7 +301,7 @@ Responde en formato JSON con la siguiente estructura:
 Solo incluye campos de mejora si realmente hay algo que mejorar. Si un campo está bien, no lo incluyas en la respuesta.
 `;
 
-      const completion = await this.openai.chat.completions.create({
+      const completion = await openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
         messages: [
           {
@@ -347,6 +354,7 @@ Solo incluye campos de mejora si realmente hay algo que mejorar. Si un campo est
 
   async suggestUseCaseContent(context: string) {
     try {
+      const openai = this.initializeOpenAI();
       const prompt = `
 Basándote en el siguiente contexto de caso de uso bancario, sugiere contenido mejorado para los campos:
 
@@ -385,7 +393,7 @@ Responde en formato JSON con la siguiente estructura:
 }
 `;
 
-      const completion = await this.openai.chat.completions.create({
+      const completion = await openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
         messages: [
           {
@@ -437,6 +445,7 @@ Responde en formato JSON con la siguiente estructura:
 
   async suggestApisByDomain(domains: string[], useCaseContext: string) {
     try {
+      const openai = this.initializeOpenAI();
       const prompt = `
 Basándote en el siguiente caso de uso bancario y los dominios BIAN seleccionados, sugiere las APIs más relevantes para cada dominio:
 
@@ -506,7 +515,7 @@ Responde en formato JSON con la siguiente estructura:
 }
 `;
 
-      const completion = await this.openai.chat.completions.create({
+      const completion = await openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
         messages: [
           {
