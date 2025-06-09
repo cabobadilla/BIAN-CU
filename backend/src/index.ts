@@ -75,6 +75,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Configuración de Swagger
+/*
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
@@ -101,11 +102,14 @@ const swaggerOptions = {
       }
     }
   },
-  apis: ['./src/routes/*.ts', './src/models/*.ts']
+  apis: process.env.NODE_ENV === 'production' 
+    ? ['./dist/routes/*.js', './dist/models/*.js']
+    : ['./src/routes/*.ts', './src/models/*.ts']
 };
 
 const specs = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+*/
 
 // Rutas
 app.use('/api/v1/auth', authRoutes);
