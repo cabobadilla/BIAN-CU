@@ -65,12 +65,17 @@ router.get('/google/callback',
         logger.info('Generando token para usuario:', user.email);
         const token = jwt.sign(
           { 
-            userId: user._id, 
+            sub: user._id,  // Cambiar userId a sub para JWT Strategy
             email: user.email,
-            companyId: user.companyId 
+            companyId: user.companyId,
+            role: user.role
           },
           process.env.JWT_SECRET || 'fallback-secret',
-          { expiresIn: '7d' }
+          { 
+            expiresIn: '7d',
+            issuer: 'bian-cu-platform',
+            audience: 'bian-cu-users'
+          }
         );
         
         logger.info('Token generado exitosamente');
