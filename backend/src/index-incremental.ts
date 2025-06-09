@@ -82,7 +82,7 @@ console.log('9. Passport basic setup completed');
 
 // PASO 3: Agregar estrategias OAuth
 console.log('10. Importing OAuth strategies...');
-import './config/passportConfig';
+import './config/passport';
 console.log('11. OAuth strategies configured');
 
 // Ruta de health check
