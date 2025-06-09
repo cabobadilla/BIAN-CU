@@ -63,12 +63,24 @@ function App() {
   const { isLoading, setLoading } = useAuthStore();
 
   useEffect(() => {
+    // Logging detallado para debugging
+    console.log('=== APP COMPONENT LOAD DEBUG ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Current URL:', window.location.href);
+    console.log('Pathname:', window.location.pathname);
+    console.log('Search:', window.location.search);
+    console.log('Hash:', window.location.hash);
+    console.log('Referrer:', document.referrer);
+    console.log('User Agent:', navigator.userAgent);
+    
     // Simular verificación inicial de autenticación
     const checkAuth = async () => {
+      console.log('Starting auth check...');
       setLoading(true);
       // Aquí podrías verificar el token almacenado
       // Por ahora solo simulamos un delay
       setTimeout(() => {
+        console.log('Auth check completed');
         setLoading(false);
       }, 1000);
     };

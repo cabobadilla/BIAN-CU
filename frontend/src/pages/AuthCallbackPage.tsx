@@ -13,12 +13,25 @@ const AuthCallbackPage = () => {
   useEffect(() => {
     const processAuth = async () => {
       try {
+        // Logging detallado para debugging
+        console.log('=== AUTH CALLBACK DEBUG ===');
+        console.log('Timestamp:', new Date().toISOString());
+        console.log('Current URL:', window.location.href);
+        console.log('Search params:', {
+          token: searchParams.get('token') ? 'PRESENT' : 'MISSING',
+          error: searchParams.get('error'),
+          all_params: Object.fromEntries(searchParams.entries())
+        });
+        console.log('Referrer:', document.referrer);
+        
         const token = searchParams.get('token');
         const error = searchParams.get('error');
 
         if (error) {
+          console.log('ERROR in callback:', error);
           setStatus('error');
           setMessage(getErrorMessage(error));
+          console.log('Redirecting to login with error:', error);
           setTimeout(() => {
             navigate('/login?error=' + error);
           }, 3000);
@@ -26,6 +39,7 @@ const AuthCallbackPage = () => {
         }
 
         if (!token) {
+          console.log('NO TOKEN received in callback');
           setStatus('error');
           setMessage('No se recibió el token de autenticación');
           setTimeout(() => {
@@ -34,14 +48,24 @@ const AuthCallbackPage = () => {
           return;
         }
 
+        console.log('TOKEN received, verifying with backend...');
+        
         // Verificar el token con el backend usando la URL completa
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-        const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://bian-cu-backend.onrender.com';
+        console.log('API_BASE_URL:', API_BASE_URL);
+        
+        const verifyUrl = `${API_BASE_URL}/api/v1/auth/me`;
+        console.log('Verifying token at:', verifyUrl);
+        
+        const response = await fetch(verifyUrl, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
+
+        console.log('Verification response status:', response.status);
+        console.log('Verification response ok:', response.ok);
 
         if (response.ok) {
           const result = await response.json();
@@ -54,10 +78,13 @@ const AuthCallbackPage = () => {
           setStatus('success');
           setMessage('¡Autenticación exitosa! Redirigiendo...');
           
+          console.log('Auth successful, redirecting to dashboard...');
           setTimeout(() => {
             navigate('/dashboard');
           }, 2000);
         } else {
+          const errorText = await response.text();
+          console.log('Token verification failed:', errorText);
           throw new Error('Token inválido');
         }
 
