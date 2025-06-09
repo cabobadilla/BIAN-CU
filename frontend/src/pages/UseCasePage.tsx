@@ -795,7 +795,7 @@ const DocumentationTab: React.FC<{ useCase: UseCase }> = ({ useCase }) => {
   const [yamlContent, setYamlContent] = useState<string>('');
   const [isLoadingYaml, setIsLoadingYaml] = useState(false);
   const [yamlError, setYamlError] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'yaml' | 'swagger'>('yaml');
+  // const [viewMode, setViewMode] = useState<'yaml' | 'swagger'>('yaml'); // Removido temporalmente
 
   // Obtener las APIs seleccionadas con sus detalles
   const { data: apisResponse, isLoading: apisLoading } = useQuery({

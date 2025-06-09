@@ -1,0 +1,40 @@
+services:
+  # Backend API - Web Service
+  - type: web
+    name: bian-cu-backend
+    runtime: node
+    plan: free
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        value: https://bian-cu-frontend.onrender.com
+      - key: API_URL
+        value: https://bian-cu-backend.onrender.com
+      - key: LOG_LEVEL
+        value: info
+
+  # Frontend - Static Site
+  - type: web
+    name: bian-cu-frontend
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://bian-cu-backend.onrender.com 
