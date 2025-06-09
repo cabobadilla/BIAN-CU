@@ -36,21 +36,33 @@ router.get('/google',
  */
 router.get('/google/callback',
   (req: Request, res: Response, next: any) => {
+    logger.info('=== GOOGLE CALLBACK START ===');
+    logger.info(`Callback URL: ${req.url}`);
+    logger.info(`Query params: ${JSON.stringify(req.query)}`);
+    
     passport.authenticate('google', (err: any, user: any, info: any) => {
+      logger.info('=== PASSPORT AUTHENTICATE RESULT ===');
+      logger.info(`Error: ${err ? JSON.stringify(err) : 'null'}`);
+      logger.info(`User: ${user ? JSON.stringify({id: user._id, email: user.email}) : 'null'}`);
+      logger.info(`Info: ${info ? JSON.stringify(info) : 'null'}`);
+      
       if (err) {
         logger.error('Error en autenticación Google:', err);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        logger.info(`Redirecting to: ${frontendUrl}/login?error=auth_failed`);
         return res.redirect(`${frontendUrl}/login?error=auth_failed`);
       }
       
       if (!user) {
         logger.error('No se obtuvo usuario de Google:', info);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        logger.info(`Redirecting to: ${frontendUrl}/login?error=no_user`);
         return res.redirect(`${frontendUrl}/login?error=no_user`);
       }
 
       // Generar JWT token
       try {
+        logger.info('=== GENERATING JWT TOKEN ===');
         const token = jwt.sign(
           { 
             sub: user._id,
@@ -70,12 +82,16 @@ router.get('/google/callback',
 
         // Redirigir al frontend con el token
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+        const redirectUrl = `${frontendUrl}/auth/callback?token=${token}`;
+        logger.info(`Redirecting to: ${redirectUrl}`);
+        res.redirect(redirectUrl);
         
       } catch (tokenError) {
         logger.error('Error generando token JWT:', tokenError);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}/login?error=token_failed`);
+        const errorUrl = `${frontendUrl}/login?error=token_failed`;
+        logger.info(`Redirecting to: ${errorUrl}`);
+        res.redirect(errorUrl);
       }
     })(req, res, next);
   }
