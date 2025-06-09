@@ -6,10 +6,21 @@ import { Company } from '../models/Company';
 import { logger } from '../utils/logger';
 
 // Configuración de Google OAuth Strategy
+logger.info('=== PASSPORT CONFIGURATION DEBUG ===');
+logger.info(`GOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET'}`);
+logger.info(`GOOGLE_CLIENT_SECRET: ${process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET'}`);
+logger.info(`API_URL: ${process.env.API_URL || 'NOT SET'}`);
+logger.info(`NODE_ENV: ${process.env.NODE_ENV || 'NOT SET'}`);
+
+// Determinar callback URL
+const baseUrl = process.env.API_URL || 'https://bian-cu-backend.onrender.com';
+const callbackURL = `${baseUrl}/api/v1/auth/google/callback`;
+logger.info(`Callback URL configured: ${callbackURL}`);
+
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID!,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-  callbackURL: `${process.env.API_URL}/api/v1/auth/google/callback`
+  callbackURL
 }, async (accessToken, refreshToken, profile, done) => {
   try {
     logger.info('=== INICIO GOOGLE OAUTH STRATEGY ===');

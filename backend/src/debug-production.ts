@@ -23,7 +23,6 @@ try {
       console.log('✅ MongoDB connected successfully');
       
       console.log('6. Testing Company model import...');
-      // Simulate the Company model import that might be failing
       try {
         const { Company } = require('./models/Company');
         console.log('✅ Company model imported successfully');
@@ -31,7 +30,31 @@ try {
         console.log('7. Testing simple Company query...');
         Company.findOne({}).then(() => {
           console.log('✅ Company query successful');
-          process.exit(0);
+          
+          console.log('8. Starting basic HTTP server...');
+          const express = require('express');
+          const app = express();
+          const PORT = process.env.PORT || 10000;
+          
+          // Ruta básica de health check
+          app.get('/', (req: any, res: any) => {
+            res.json({ 
+              status: 'DEBUG SERVER RUNNING',
+              timestamp: new Date().toISOString(),
+              message: 'MongoDB and models are working correctly'
+            });
+          });
+          
+          app.get('/health', (req: any, res: any) => {
+            res.json({ status: 'OK', debug: true });
+          });
+          
+          app.listen(PORT, () => {
+            console.log(`✅ Debug server running on port ${PORT}`);
+            console.log('✅ MongoDB and Company model verified successfully');
+            console.log('🔍 Ready to switch back to main server');
+          });
+          
         }).catch((error: any) => {
           console.log('❌ Company query failed:', error.message);
           process.exit(1);
