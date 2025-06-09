@@ -137,35 +137,58 @@ app.get('/test-oauth', (req, res) => {
 // Configurar rutas OAuth
 app.use('/api/v1/auth', authRoutes);
 
+// AGREGAR TODAS LAS RUTAS PRINCIPALES
+console.log('17. Importing main application routes...');
+
+// Importar todas las rutas principales
+import { useCaseRoutes } from './routes/useCases';
+import { companyRoutes } from './routes/companies';
+import { bianRoutes } from './routes/bian';
+import { schemaRoutes } from './routes/schemas';
+import { apiCustomizationRoutes } from './routes/apiCustomizations';
+import { singleApiRoutes } from './routes/singleApiRoutes';
+import { dataSourceRoutes } from './routes/dataSources';
+
+// Configurar todas las rutas principales
+app.use('/api/v1/use-cases', useCaseRoutes);
+app.use('/api/v1/companies', companyRoutes);
+app.use('/api/v1/bian', bianRoutes);
+app.use('/api/v1/schemas', schemaRoutes);
+app.use('/api/v1/api-customizations', apiCustomizationRoutes);
+app.use('/api/v1/single-api', singleApiRoutes);
+app.use('/api/v1/data-sources', dataSourceRoutes);
+
+console.log('18. All application routes configured');
+
 // Configurar error handler (DEBE ir al final)
 app.use(errorHandler);
 
-console.log('16. Routes and error handler configured');
+console.log('19. Routes and error handler configured');
 
 // Inicializar servidor
 async function startServer() {
   try {
-    console.log('17. Starting server initialization...');
+    console.log('20. Starting server initialization...');
     
     // Solo conectar a MongoDB si está configurado
     if (process.env.MONGODB_URI && process.env.MONGODB_URI !== '...........') {
-      console.log('18. Connecting to MongoDB...');
+      console.log('21. Connecting to MongoDB...');
       await connectDB();
       logger.info('✅ MongoDB conectado');
       
-      console.log('19. Initializing default data...');
+      console.log('22. Initializing default data...');
       await initializeDefaultData();
       
-      console.log('20. MongoDB and initialization completed');
+      console.log('23. MongoDB and initialization completed');
     } else {
       logger.warn('⚠️ MongoDB no configurado');
     }
     
-    console.log('21. Starting HTTP server...');
+    console.log('24. Starting HTTP server...');
     app.listen(PORT, () => {
       logger.info(`🚀 Servidor INCREMENTAL ejecutándose en puerto ${PORT}`);
       console.log(`✅ INCREMENTAL Server running on port ${PORT}`);
-      console.log('22. Server started successfully');
+      console.log('25. Server started successfully');
     });
   } catch (error) {
     logger.error('Error al inicializar el servidor:', error);
@@ -174,5 +197,5 @@ async function startServer() {
   }
 }
 
-console.log('23. Calling startServer...');
+console.log('26. Calling startServer...');
 startServer(); 
