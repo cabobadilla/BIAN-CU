@@ -4,6 +4,7 @@ dotenv.config({ path: '.env.local' });
 
 console.log('=== INCREMENTAL SERVER START ===');
 console.log('1. Dotenv configured');
+// Force redeploy v2 - 2025-06-09
 
 import express from 'express';
 import cors from 'cors';
