@@ -114,6 +114,26 @@ app.get('/', (req, res) => {
   });
 });
 
+// TEST ROUTE PARA OAUTH
+app.get('/test-oauth', (req, res) => {
+  res.json({
+    status: 'OAuth Test',
+    environment: {
+      NODE_ENV: process.env.NODE_ENV,
+      FRONTEND_URL: process.env.FRONTEND_URL,
+      MONGODB_URI: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET',
+      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET',
+      JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET'
+    },
+    oauthUrls: {
+      login: '/api/v1/auth/google',
+      callback: '/api/v1/auth/google/callback'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Configurar rutas OAuth
 app.use('/api/v1/auth', authRoutes);
 

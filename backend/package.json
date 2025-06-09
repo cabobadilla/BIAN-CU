@@ -1,7 +1,7 @@
 {
   "name": "bian-cu-backend",
-  "version": "1.0.0",
-  "description": "Backend API para BIAN-CU Platform",
+  "version": "1.0.1",
+  "description": "Backend API para BIAN-CU Platform - FORCE REDEPLOY",
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon src/index.ts",
