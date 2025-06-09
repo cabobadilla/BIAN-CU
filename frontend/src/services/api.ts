@@ -16,14 +16,30 @@ const api: AxiosInstance = axios.create({
 // Interceptor para agregar token de autenticación
 api.interceptors.request.use(
   (config) => {
-    const token = useAuthStore.getState().token;
+    const authState = useAuthStore.getState();
+    const token = authState.token;
+    
+    // Debug logging
+    console.log('=== API INTERCEPTOR DEBUG ===');
+    console.log('Auth state:', {
+      isAuthenticated: authState.isAuthenticated,
+      tokenExists: !!token,
+      tokenStart: token ? token.substring(0, 20) + '...' : 'null',
+      userEmail: authState.user?.email || 'no user'
+    });
+    console.log('Request URL:', config.url);
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('✅ Using real JWT token');
     } else {
       // TEMPORAL: Agregar un token dummy para development/testing
-      console.warn('No hay token de autenticación, usando token dummy para desarrollo');
+      console.warn('❌ No hay token de autenticación, usando token dummy para desarrollo');
       config.headers.Authorization = `Bearer dummy-token-for-development`;
     }
+    console.log('Final Authorization header:', config.headers.Authorization?.substring(0, 30) + '...');
+    console.log('==============================');
+    
     return config;
   },
   (error) => {
