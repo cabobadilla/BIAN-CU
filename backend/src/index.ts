@@ -47,19 +47,28 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Configuración de sesiones
-app.use(session({
+const sessionConfig: any = {
   secret: process.env.JWT_SECRET || 'fallback-secret',
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({
-    mongoUrl: process.env.MONGODB_URI
-  }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 horas
   }
-}));
+};
+
+// Solo usar MongoStore si MongoDB está configurado
+if (process.env.MONGODB_URI && process.env.MONGODB_URI !== '...........') {
+  sessionConfig.store = MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI
+  });
+  logger.info('Using MongoDB for session storage');
+} else {
+  logger.warn('MongoDB not configured, using memory store for sessions (not recommended for production)');
+}
+
+app.use(session(sessionConfig));
 
 // Configuración de Passport
 app.use(passport.initialize());
@@ -123,7 +132,13 @@ app.use(errorHandler);
 // Inicializar servidor
 async function startServer() {
   try {
-    await connectDB();
+    // Solo conectar a MongoDB si está configurado
+    if (process.env.MONGODB_URI && process.env.MONGODB_URI !== '...........') {
+      await connectDB();
+      logger.info('✅ MongoDB conectado');
+    } else {
+      logger.warn('⚠️ MongoDB no configurado - algunas funciones pueden no funcionar');
+    }
     
     app.listen(PORT, () => {
       logger.info(`🚀 Servidor ejecutándose en puerto ${PORT}`);
