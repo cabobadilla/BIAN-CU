@@ -4,6 +4,7 @@ dotenv.config({ path: '.env.local' });
 
 console.log('=== PROGRESSIVE SERVER START ===');
 console.log('Environment:', process.env.NODE_ENV);
+// Force progressive deploy v1 - 2025-06-09
 
 // Imports (ya sabemos que funcionan)
 import express from 'express';
