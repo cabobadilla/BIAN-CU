@@ -733,8 +733,10 @@ IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido, sin explicaciones adic
       const openai = this.initializeOpenAI();
       
       logger.info('=== Sugerencia de APIs basada en APIs disponibles ===');
-      logger.info('Dominios:', domains);
+      logger.info('Dominios seleccionados:', domains);
+      logger.info('Número de dominios:', domains.length);
       logger.info('APIs disponibles:', availableApis.length);
+      logger.info('APIs disponibles detalle:', availableApis.map(api => `${api.name} (${api.domain})`));
 
       if (availableApis.length === 0) {
         logger.warn('No hay APIs disponibles para los dominios seleccionados');
@@ -747,18 +749,23 @@ IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido, sin explicaciones adic
       ).join('\n');
 
       const prompt = `
-Basándote en el siguiente caso de uso bancario y las APIs BIAN disponibles, selecciona las más relevantes:
+Basándote en el siguiente caso de uso bancario y las APIs BIAN disponibles, selecciona las más relevantes para TODOS los dominios:
 
 CASO DE USO:
 ${useCaseContext}
 
-DOMINIOS SELECCIONADOS:
-${domains.join(', ')}
+DOMINIOS SELECCIONADOS: ${domains.join(', ')}
+NÚMERO DE DOMINIOS: ${domains.length}
 
 APIs DISPONIBLES (selecciona solo de esta lista):
 ${apisList}
 
-IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido, sin explicaciones adicionales. Solo sugiere APIs que estén en la lista de APIs disponibles.
+INSTRUCCIONES IMPORTANTES:
+1. Responde ÚNICAMENTE en formato JSON válido, sin explicaciones adicionales
+2. Solo sugiere APIs que estén en la lista de APIs disponibles
+3. DEBES seleccionar al menos UNA API para CADA DOMINIO seleccionado
+4. Si hay múltiples APIs relevantes para un dominio, selecciona las más apropiadas
+5. Asegúrate de cubrir TODOS los dominios: ${domains.join(', ')}
 
 Estructura exacta:
 {
@@ -769,7 +776,7 @@ Estructura exacta:
       "reason": "Razón específica para este caso de uso"
     }
   ],
-  "reasoning": "Explicación general de la selección",
+  "reasoning": "Explicación general de la selección, mencionando cómo cubres todos los dominios",
   "confidence": 0.85
 }`;
 
@@ -838,7 +845,18 @@ Estructura exacta:
         availableApiNames.includes(api.name)
       );
 
-      logger.info(`APIs sugeridas validadas: ${validSuggestions.length} de ${suggestions.suggestedApis?.length || 0}`);
+      logger.info(`=== VALIDACIÓN DE SUGERENCIAS ===`);
+      logger.info(`APIs sugeridas por OpenAI: ${suggestions.suggestedApis?.length || 0}`);
+      logger.info(`APIs sugeridas detalle:`, suggestions.suggestedApis?.map((api: any) => `${api.name} (${api.domain})`));
+      logger.info(`APIs validadas: ${validSuggestions.length}`);
+      logger.info(`APIs validadas detalle:`, validSuggestions.map((api: any) => `${api.name} (${api.domain})`));
+      
+      // Verificar cobertura por dominio
+      const dominiosCubiertos = new Set(validSuggestions.map((api: any) => api.domain));
+      const dominiosFaltantes = domains.filter(domain => !dominiosCubiertos.has(domain));
+      if (dominiosFaltantes.length > 0) {
+        logger.warn(`Dominios sin APIs sugeridas: ${dominiosFaltantes.join(', ')}`);
+      }
 
       const result = {
         suggestedApis: validSuggestions,
@@ -860,49 +878,75 @@ Estructura exacta:
     
     const apisByDomain: Record<string, Array<{name: string, reason: string}>> = {
       'Customer Management': [
-        { name: 'Customer Directory', reason: 'Gestión de datos básicos del cliente' },
+        { name: 'Customer Directory - Retrieve', reason: 'Obtener información detallada del cliente' },
+        { name: 'Customer Directory - Register', reason: 'Registrar nuevos clientes' },
         { name: 'Customer Relationship Management', reason: 'Gestión de relaciones con clientes' }
       ],
       'Product Management': [
-        { name: 'Product Directory', reason: 'Catálogo de productos bancarios' },
+        { name: 'Product Directory - Retrieve', reason: 'Consultar catálogo de productos bancarios' },
+        { name: 'Product Directory - Register', reason: 'Registrar nuevos productos' },
         { name: 'Product Design', reason: 'Configuración de productos' }
       ],
       'Customer Offer': [
-        { name: 'Customer Offer', reason: 'Gestión de ofertas personalizadas' }
+        { name: 'Customer Offer - Initiate', reason: 'Iniciar ofertas personalizadas' },
+        { name: 'Customer Offer - Retrieve', reason: 'Consultar ofertas existentes' }
       ],
       'Customer Agreement': [
-        { name: 'Customer Agreement', reason: 'Gestión de contratos y acuerdos' }
+        { name: 'Customer Agreement - Initiate', reason: 'Iniciar contratos y acuerdos' },
+        { name: 'Customer Agreement - Retrieve', reason: 'Consultar contratos existentes' }
       ],
       'Payment Order': [
         { name: 'Payment Order - Initiate', reason: 'Iniciar órdenes de pago' },
-        { name: 'Payment Order - Retrieve', reason: 'Consultar órdenes de pago' }
+        { name: 'Payment Order - Retrieve', reason: 'Consultar órdenes de pago' },
+        { name: 'Payment Order - Update', reason: 'Actualizar órdenes de pago' }
       ],
       'Payment Execution': [
-        { name: 'Payment Execution', reason: 'Ejecución de pagos' }
+        { name: 'Payment Execution - Initiate', reason: 'Ejecutar pagos' },
+        { name: 'Payment Execution - Retrieve', reason: 'Consultar estado de pagos' }
       ],
       'Credit Management': [
-        { name: 'Credit Facility', reason: 'Gestión de facilidades crediticias' }
+        { name: 'Credit Facility - Initiate', reason: 'Iniciar facilidades crediticias' },
+        { name: 'Credit Facility - Retrieve', reason: 'Consultar facilidades crediticias' }
       ],
       'Customer Position': [
-        { name: 'Customer Position', reason: 'Gestión de posiciones del cliente' }
+        { name: 'Customer Position - Retrieve', reason: 'Consultar posiciones del cliente' },
+        { name: 'Customer Position - Update', reason: 'Actualizar posiciones del cliente' }
       ]
     };
 
+    // Asegurar que cada dominio tenga al menos una API sugerida
     const suggestedApis = domains.flatMap(domain => {
-      const apis = apisByDomain[domain] || [
-        { name: domain, reason: `API básica para operaciones del dominio ${domain}` }
-      ];
-      return apis.map(api => ({
-        name: api.name,
-        domain: domain,
-        reason: api.reason
-      }));
+      const apis = apisByDomain[domain];
+      if (apis && apis.length > 0) {
+        // Para dominios conocidos, seleccionar las APIs más relevantes (mínimo 1, máximo 2)
+        return apis.slice(0, 2).map(api => ({
+          name: api.name,
+          domain: domain,
+          reason: api.reason
+        }));
+      } else {
+        // Para dominios desconocidos, generar APIs básicas
+        return [
+          { 
+            name: `${domain} - Retrieve`, 
+            domain: domain, 
+            reason: `Consultar información del dominio ${domain}` 
+          },
+          { 
+            name: `${domain} - Initiate`, 
+            domain: domain, 
+            reason: `Iniciar operaciones del dominio ${domain}` 
+          }
+        ];
+      }
     });
+
+    logger.info(`Sugerencias básicas generadas: ${suggestedApis.length} APIs para ${domains.length} dominios`);
 
     return {
       suggestedApis,
-      reasoning: `Sugerencias básicas generadas automáticamente para los dominios: ${domains.join(', ')}. ${useCaseContext ? 'Basado en el contexto del caso de uso.' : ''}`,
-      confidence: 0.6
+      reasoning: `Sugerencias generadas para TODOS los dominios seleccionados: ${domains.join(', ')}. Se han seleccionado APIs básicas de Retrieve e Initiate para cada dominio para cubrir las operaciones fundamentales. ${useCaseContext ? 'Basado en el contexto del caso de uso.' : ''}`,
+      confidence: 0.7
     };
   }
 
