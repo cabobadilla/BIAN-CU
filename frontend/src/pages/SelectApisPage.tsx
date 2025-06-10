@@ -81,28 +81,123 @@ const SelectApisPage: React.FC = () => {
 
     setIsAnalyzing(true);
     try {
+      // NUEVA ESTRATEGIA: Usar el backend con lógica recursiva por dominio
+      await getBackendApiSuggestions(useCaseData);
+    } catch (error) {
+      console.error('Error analizando APIs con backend, usando fallback local:', error);
+      // Fallback: usar la lógica local original
       const apiGroups = generateApiGroups(
         useCaseData.selectedDomains,
         useCaseData
       );
       
       setDomainGroups(apiGroups);
-      
-      // Expandir todos los dominios por defecto
       setExpandedDomains(new Set(apiGroups.map(group => group.domain)));
       
-      // Seleccionar APIs recomendadas
       const recommendedApis = apiGroups.flatMap(group => 
         group.apis.filter(api => api.recommended).map(api => api.id)
       );
       setSelectedApis(recommendedApis);
       setShowAnalysis(true);
-    } catch (error) {
-      console.error('Error analizando APIs:', error);
-      alert('Error al analizar APIs. Por favor intenta de nuevo.');
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  // Nueva función para obtener sugerencias del backend con lógica recursiva
+  const getBackendApiSuggestions = async (useCaseData: any) => {
+    setIsGettingApiSuggestions(true);
+    try {
+      console.log('=== USANDO BACKEND RECURSIVO PARA CREACIÓN ===');
+      console.log('Dominios seleccionados:', useCaseData.selectedDomains);
+
+      const useCaseContext = `
+TÍTULO: ${useCaseData.title}
+DESCRIPCIÓN: ${useCaseData.description}
+OBJETIVO: ${useCaseData.objective || ''}
+DOMINIOS SELECCIONADOS: ${useCaseData.selectedDomains.join(', ')}
+      `.trim();
+
+      // Usar el endpoint de sugerencias AI del backend
+      const response = await useCaseService.aiSuggestApis({
+        domains: useCaseData.selectedDomains,
+        useCaseContext
+      });
+      
+      const aiData = (response.data as any).data;
+      console.log('APIs sugeridas por backend:', aiData);
+
+      if (aiData?.suggestedApis && aiData.suggestedApis.length > 0) {
+        // Convertir las APIs del backend al formato esperado por el frontend
+        const convertedGroups = convertBackendApisToGroups(aiData.suggestedApis, useCaseData.selectedDomains);
+        setDomainGroups(convertedGroups);
+        setExpandedDomains(new Set(convertedGroups.map(group => group.domain)));
+        
+        // Seleccionar todas las APIs sugeridas por IA
+        const recommendedApis = convertedGroups.flatMap(group => 
+          group.apis.map(api => api.id)
+        );
+        setSelectedApis(recommendedApis);
+        setShowAnalysis(true);
+        
+        console.log('APIs del backend aplicadas exitosamente:', recommendedApis);
+        alert(`✨ Se aplicaron ${aiData.suggestedApis.length} APIs sugeridas por IA para todos los dominios seleccionados`);
+      } else {
+        throw new Error('No se recibieron APIs válidas del backend');
+      }
+    } catch (error) {
+      console.error('Error obteniendo APIs del backend:', error);
+      alert('Error al obtener sugerencias de APIs con IA. Se usarán sugerencias locales.');
+      throw error; // Re-throw para que el caller maneje el fallback
+    } finally {
+      setIsGettingApiSuggestions(false);
+    }
+  };
+
+  // Función para convertir APIs del backend al formato del frontend
+  const convertBackendApisToGroups = (backendApis: any[], domains: string[]): DomainApisGroup[] => {
+    const groups: DomainApisGroup[] = [];
+
+    // Agrupar APIs por dominio
+    const apisByDomain = domains.reduce((acc, domain) => {
+      acc[domain] = backendApis.filter(api => api.domain === domain);
+      return acc;
+    }, {} as Record<string, any[]>);
+
+    for (const domain of domains) {
+      const domainApis = apisByDomain[domain] || [];
+      
+      if (domainApis.length > 0) {
+        const convertedApis: ApiRecommendation[] = domainApis.map((api, index) => ({
+          id: `${domain.toLowerCase().replace(/\s+/g, '-')}-${index}`,
+          name: api.name,
+          domain: api.domain,
+          description: api.reason || api.description || `API para ${api.domain}`,
+          recommended: true, // Todas las APIs del backend son recomendadas
+          confidence: 0.9, // Alta confianza ya que vienen de IA
+          reason: api.reason || `Sugerido por IA para el dominio ${api.domain}`,
+          methods: [
+            {
+              method: 'GET',
+              endpoint: `/${api.name.toLowerCase().replace(/\s+/g, '-')}`,
+              description: `Obtener información de ${api.name}`
+            },
+            {
+              method: 'POST',
+              endpoint: `/${api.name.toLowerCase().replace(/\s+/g, '-')}`,
+              description: `Crear/Iniciar ${api.name}`
+            }
+          ]
+        }));
+
+        groups.push({
+          domain,
+          apis: convertedApis
+        });
+      }
+    }
+
+    return groups;
   };
 
   const generateApiGroups = (domains: string[], useCaseData: any): DomainApisGroup[] => {
@@ -548,10 +643,33 @@ const SelectApisPage: React.FC = () => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver a Dominios
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">Seleccionar APIs Semánticas</h1>
-          <p className="mt-2 text-gray-600">
-            Caso de uso: <span className="font-medium">{useCaseData?.title}</span>
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Seleccionar APIs Semánticas</h1>
+              <p className="mt-2 text-gray-600">
+                Caso de uso: <span className="font-medium">{useCaseData?.title}</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => getBackendApiSuggestions(useCaseData)}
+                disabled={isGettingApiSuggestions || !useCaseData?.selectedDomains?.length}
+                className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+              >
+                {isGettingApiSuggestions ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Analizando...
+                  </>
+                ) : (
+                  <>
+                    <Brain className="h-4 w-4" />
+                    ✨ Sugerir APIs con IA
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Análisis en progreso */}
