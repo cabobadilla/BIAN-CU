@@ -743,125 +743,131 @@ IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido, sin explicaciones adic
         return this.generateBasicApiSuggestions(domains, useCaseContext);
       }
 
-      // Crear lista de APIs disponibles para el prompt
-      const apisList = availableApis.map(api => 
-        `- ${api.name} (${api.domain}): ${api.description || 'API del dominio ' + api.domain}`
-      ).join('\n');
+      // NUEVA ESTRATEGIA: Hacer sugerencias por dominio individual y luego combinar
+      logger.info('=== INICIANDO SUGERENCIAS POR DOMINIO INDIVIDUAL ===');
+      
+      const apisByDomain = domains.map(domain => {
+        return {
+          domain,
+          apis: availableApis.filter(api => api.domain === domain)
+        };
+      });
 
-      const prompt = `
-Basándote en el siguiente caso de uso bancario y las APIs BIAN disponibles, selecciona las más relevantes para TODOS los dominios:
+      logger.info('APIs por dominio:', apisByDomain.map(d => `${d.domain}: ${d.apis.length} APIs`));
+
+      let allSuggestions: any[] = [];
+      let combinedReasoning: string[] = [];
+
+      // Procesar cada dominio individualmente
+      for (const domainData of apisByDomain) {
+        if (domainData.apis.length === 0) {
+          logger.warn(`No hay APIs disponibles para el dominio: ${domainData.domain}`);
+          // Agregar APIs básicas para este dominio
+          const basicApis = this.generateBasicApiSuggestions([domainData.domain], useCaseContext);
+          allSuggestions.push(...basicApis.suggestedApis);
+          combinedReasoning.push(`${domainData.domain}: APIs básicas generadas automáticamente`);
+          continue;
+        }
+
+        logger.info(`=== Procesando dominio: ${domainData.domain} ===`);
+        logger.info(`APIs disponibles para ${domainData.domain}:`, domainData.apis.map(api => api.name));
+
+        const domainApisList = domainData.apis.map(api => 
+          `- ${api.name}: ${api.description || 'API del dominio ' + api.domain}`
+        ).join('\n');
+
+        const domainPrompt = `
+Basándote en el siguiente caso de uso bancario y las APIs BIAN disponibles para el dominio ${domainData.domain}, selecciona las más relevantes:
 
 CASO DE USO:
 ${useCaseContext}
 
-DOMINIOS SELECCIONADOS: ${domains.join(', ')}
-NÚMERO DE DOMINIOS: ${domains.length}
+DOMINIO A PROCESAR: ${domainData.domain}
 
-APIs DISPONIBLES (selecciona solo de esta lista):
-${apisList}
+APIs DISPONIBLES PARA ${domainData.domain.toUpperCase()}:
+${domainApisList}
 
-INSTRUCCIONES IMPORTANTES:
-1. Responde ÚNICAMENTE en formato JSON válido, sin explicaciones adicionales
-2. Solo sugiere APIs que estén en la lista de APIs disponibles
-3. DEBES seleccionar al menos UNA API para CADA DOMINIO seleccionado
-4. Si hay múltiples APIs relevantes para un dominio, selecciona las más apropiadas
-5. Asegúrate de cubrir TODOS los dominios: ${domains.join(', ')}
+INSTRUCCIONES:
+1. Responde ÚNICAMENTE en formato JSON válido
+2. Solo sugiere APIs de la lista del dominio ${domainData.domain}
+3. Selecciona entre 1-3 APIs más relevantes para este dominio específico
+4. Enfócate en las operaciones más importantes para el caso de uso
 
 Estructura exacta:
 {
   "suggestedApis": [
     {
-      "name": "Nombre exacto de la API de la lista",
-      "domain": "Dominio de la API",
+      "name": "Nombre exacto de la API",
+      "domain": "${domainData.domain}",
       "reason": "Razón específica para este caso de uso"
     }
   ],
-  "reasoning": "Explicación general de la selección, mencionando cómo cubres todos los dominios",
-  "confidence": 0.85
+  "reasoning": "Por qué estas APIs son relevantes para ${domainData.domain}"
 }`;
 
-      logger.info('Prompt enviado a OpenAI para APIs disponibles:', prompt.substring(0, 300) + '...');
+        try {
+          logger.info(`Enviando prompt para dominio ${domainData.domain}...`);
+          
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-3.5-turbo',
+            messages: [
+              {
+                role: 'system',
+                content: `Eres un experto en BIAN v13. Analiza solo APIs del dominio ${domainData.domain}. Responde en JSON válido.`
+              },
+              {
+                role: 'user',
+                content: domainPrompt
+              }
+            ],
+            temperature: 0.2,
+            max_tokens: 800,
+          });
 
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: 'Eres un experto en el estándar BIAN v13 y arquitectura de APIs bancarias. Selecciona solo APIs de la lista proporcionada. Responde ÚNICAMENTE en formato JSON válido.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 1500,
-      });
+          const response = completion.choices[0]?.message?.content;
+          logger.info(`Respuesta OpenAI para ${domainData.domain}:`, response?.substring(0, 200) + '...');
 
-      const response = completion.choices[0]?.message?.content;
-      
-      logger.info('Respuesta de OpenAI para APIs disponibles:', response || 'RESPUESTA VACÍA');
-      
-      if (!response || response.trim() === '') {
-        logger.error('OpenAI devolvió respuesta vacía');
-        return this.generateBasicApiSuggestions(domains, useCaseContext);
-      }
+          if (response && response.trim() !== '') {
+            const cleanedJSON = this.extractJSON(response);
+            const domainSuggestions = JSON.parse(cleanedJSON);
+            
+            // Validar APIs del dominio
+            const validDomainApis = (domainSuggestions.suggestedApis || []).filter((api: any) => 
+              domainData.apis.some(availableApi => availableApi.name === api.name)
+            );
 
-      // Función para extraer JSON válido de la respuesta
-      const extractJSON = (text: string): string => {
-        let cleaned = text.trim();
-        
-        if (cleaned.includes('```')) {
-          const match = cleaned.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-          if (match) {
-            cleaned = match[1];
+            logger.info(`APIs validadas para ${domainData.domain}:`, validDomainApis.map((api: any) => api.name));
+
+            allSuggestions.push(...validDomainApis);
+            combinedReasoning.push(`${domainData.domain}: ${domainSuggestions.reasoning || 'APIs seleccionadas'}`);
           } else {
-            cleaned = cleaned.replace(/```json\s*/g, '').replace(/```\s*$/g, '').replace(/^\s*```/g, '').replace(/```\s*$/g, '');
+            throw new Error('Respuesta vacía de OpenAI');
+          }
+
+        } catch (error) {
+          logger.error(`Error procesando dominio ${domainData.domain}:`, error);
+          // Fallback: usar la mejor API disponible para este dominio
+          if (domainData.apis.length > 0) {
+            const fallbackApi = domainData.apis[0]; // Tomar la primera API
+            allSuggestions.push({
+              name: fallbackApi.name,
+              domain: domainData.domain,
+              reason: `API principal para operaciones del dominio ${domainData.domain}`
+            });
+            combinedReasoning.push(`${domainData.domain}: API de fallback seleccionada`);
           }
         }
-
-        const firstBrace = cleaned.indexOf('{');
-        const lastBrace = cleaned.lastIndexOf('}');
-        
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-          cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-        }
-
-        return cleaned.trim();
-      };
-
-      let suggestions;
-      try {
-        const cleanedJSON = extractJSON(response);
-        suggestions = JSON.parse(cleanedJSON);
-      } catch (parseError) {
-        logger.error('Error parseando JSON para APIs disponibles:', parseError);
-        return this.generateBasicApiSuggestions(domains, useCaseContext);
       }
-      
-      // Validar que las APIs sugeridas estén en la lista de disponibles
-      const availableApiNames = availableApis.map(api => api.name);
-      const validSuggestions = (suggestions.suggestedApis || []).filter((api: any) => 
-        availableApiNames.includes(api.name)
-      );
 
-      logger.info(`=== VALIDACIÓN DE SUGERENCIAS ===`);
-      logger.info(`APIs sugeridas por OpenAI: ${suggestions.suggestedApis?.length || 0}`);
-      logger.info(`APIs sugeridas detalle:`, suggestions.suggestedApis?.map((api: any) => `${api.name} (${api.domain})`));
-      logger.info(`APIs validadas: ${validSuggestions.length}`);
-      logger.info(`APIs validadas detalle:`, validSuggestions.map((api: any) => `${api.name} (${api.domain})`));
-      
-      // Verificar cobertura por dominio
-      const dominiosCubiertos = new Set(validSuggestions.map((api: any) => api.domain));
-      const dominiosFaltantes = domains.filter(domain => !dominiosCubiertos.has(domain));
-      if (dominiosFaltantes.length > 0) {
-        logger.warn(`Dominios sin APIs sugeridas: ${dominiosFaltantes.join(', ')}`);
-      }
+      logger.info('=== RESULTADO FINAL COMBINADO ===');
+      logger.info(`Total de APIs sugeridas: ${allSuggestions.length}`);
+      logger.info('Dominios cubiertos:', [...new Set(allSuggestions.map(api => api.domain))]);
+      logger.info('APIs finales:', allSuggestions.map(api => `${api.name} (${api.domain})`));
 
       const result = {
-        suggestedApis: validSuggestions,
-        reasoning: suggestions.reasoning || 'APIs seleccionadas basadas en relevancia para el caso de uso',
-        confidence: suggestions.confidence || 0.7
+        suggestedApis: allSuggestions,
+        reasoning: `Sugerencias generadas por dominio: ${combinedReasoning.join('; ')}`,
+        confidence: allSuggestions.length === domains.length ? 0.9 : 0.7
       };
 
       return result;
@@ -870,6 +876,29 @@ Estructura exacta:
       logger.error('Error sugiriendo APIs desde disponibles:', error);
       return this.generateBasicApiSuggestions(domains, useCaseContext);
     }
+  }
+
+  // Método auxiliar para extraer JSON
+  private extractJSON(text: string): string {
+    let cleaned = text.trim();
+    
+    if (cleaned.includes('```')) {
+      const match = cleaned.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (match) {
+        cleaned = match[1];
+      } else {
+        cleaned = cleaned.replace(/```json\s*/g, '').replace(/```\s*$/g, '').replace(/^\s*```/g, '').replace(/```\s*$/g, '');
+      }
+    }
+
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
+
+    return cleaned.trim();
   }
 
   // Método auxiliar para generar sugerencias básicas de APIs
