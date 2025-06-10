@@ -12,25 +12,7 @@ import axios from 'axios';
 const router = express.Router();
 
 // Middleware de autenticación para todas las rutas
-// TEMPORAL: Para desarrollo, bypasear autenticación con token dummy
-router.use((req: Request, res: Response, next: any) => {
-  const authHeader = req.headers.authorization;
-  
-  if (authHeader && authHeader.includes('dummy-token-for-development')) {
-    // Simular usuario autenticado para desarrollo
-    req.user = {
-      _id: '507f1f77bcf86cd799439011', // ObjectId falso pero válido
-      email: 'dev@example.com',
-      name: 'Developer User',
-      companyId: '507f1f77bcf86cd799439012', // ObjectId falso pero válido
-      role: 'admin'
-    };
-    return next();
-  }
-  
-  // Si no es token dummy, usar autenticación normal
-  return passport.authenticate('jwt', { session: false })(req, res, next);
-});
+router.use(passport.authenticate('jwt', { session: false }));
 
 /**
  * @swagger
@@ -80,6 +62,44 @@ router.get('/',
       data: useCases,
       count: useCases.length
     });
+  })
+);
+
+/**
+ * @swagger
+ * /api/v1/use-cases/test-openai:
+ *   get:
+ *     summary: Probar conexión con OpenAI
+ *     tags: [Use Cases]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Resultado del test de OpenAI
+ */
+router.get('/test-openai',
+  asyncHandler(async (req: Request, res: Response) => {
+    try {
+      logger.info('Iniciando test de OpenAI desde endpoint...');
+      const testResult = await openaiService.testConnection();
+      
+      res.json({
+        success: true,
+        data: testResult,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      logger.error('Error en test de OpenAI:', error);
+      
+      res.json({
+        success: false,
+        data: {
+          success: false,
+          error: error.message || 'Error desconocido'
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
   })
 );
 
@@ -429,13 +449,41 @@ router.post('/ai-suggest-apis',
 
     const { domains, useCaseContext } = req.body;
 
-    // Obtener sugerencias de APIs por dominio
-    const suggestions = await openaiService.suggestApisByDomain(domains, useCaseContext);
+    try {
+      // Obtener APIs disponibles para los dominios seleccionados
+      const availableApis = await bianService.getApisForDomains(domains, useCaseContext);
 
-    res.json({
-      success: true,
-      data: suggestions
-    });
+      logger.info('APIs disponibles para dominios:', { domains, count: availableApis.length });
+
+      // Crear lista de APIs disponibles para el prompt
+      const availableApisList = availableApis.map((api: any) => ({
+        name: api.name,
+        domain: api.domain,
+        description: api.description || ''
+      }));
+
+      // Obtener sugerencias de IA usando las APIs realmente disponibles
+      const suggestions = await openaiService.suggestApisFromAvailable(
+        domains, 
+        useCaseContext, 
+        availableApisList
+      );
+
+      res.json({
+        success: true,
+        data: suggestions
+      });
+    } catch (error) {
+      logger.error('Error en sugerencias de APIs:', error);
+      
+      // Fallback: usar el método anterior si hay error
+      const suggestions = await openaiService.suggestApisByDomain(domains, useCaseContext);
+      
+      res.json({
+        success: true,
+        data: suggestions
+      });
+    }
   })
 );
 

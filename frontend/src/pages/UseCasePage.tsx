@@ -357,6 +357,7 @@ const UseCasePage: React.FC = () => {
             domains={domains} 
             onSelectDomains={(domains) => selectDomainsMutation.mutate(domains)}
             isLoading={selectDomainsMutation.isPending}
+            queryClient={queryClient}
           />
         )}
         {activeTab === 'apis' && (
@@ -409,137 +410,509 @@ const UseCasePage: React.FC = () => {
 
 // Componente Overview Tab
 const OverviewTab: React.FC<{ useCase: UseCase }> = ({ useCase }) => {
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  const [isAnalyzingWithAI, setIsAnalyzingWithAI] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<any>(null);
+  const [showAiAnalysis, setShowAiAnalysis] = useState(false);
+  const [isGettingContentSuggestions, setIsGettingContentSuggestions] = useState(false);
+  const [contentSuggestions, setContentSuggestions] = useState<any>(null);
+  const [showContentSuggestions, setShowContentSuggestions] = useState(false);
+
+  // Función para analizar con IA
+  const handleAnalyzeWithAI = async () => {
+    setIsAnalyzingWithAI(true);
+    try {
+      const useCaseData = {
+        title: useCase.title,
+        description: useCase.description,
+        objective: useCase.objective || '',
+        actors: {
+          primary: useCase.actors?.primary || [],
+          secondary: useCase.actors?.secondary || [],
+          systems: useCase.actors?.systems || []
+        },
+        prerequisites: useCase.prerequisites || [],
+        mainFlow: useCase.mainFlow || [],
+        postconditions: useCase.postconditions || [],
+        businessRules: useCase.businessRules || []
+      };
+
+      const response = await useCaseService.analyzeWithAI(useCaseData);
+      setAiAnalysis((response.data as any).data);
+      setShowAiAnalysis(true);
+    } catch (error) {
+      console.error('Error analizando con IA:', error);
+      alert('Error al analizar el caso de uso con IA. Por favor intenta de nuevo.');
+    } finally {
+      setIsAnalyzingWithAI(false);
+    }
+  };
+
+  // Función para obtener sugerencias de contenido
+  const handleGetContentSuggestions = async () => {
+    setIsGettingContentSuggestions(true);
+    try {
+      const response = await useCaseService.aiSuggestContent({
+        title: useCase.title,
+        description: useCase.description,
+        objective: useCase.objective
+      });
+      
+      setContentSuggestions((response.data as any).data);
+      setShowContentSuggestions(true);
+    } catch (error) {
+      console.error('Error obteniendo sugerencias de contenido:', error);
+      alert('Error al obtener sugerencias de contenido. Por favor intenta de nuevo.');
+    } finally {
+      setIsGettingContentSuggestions(false);
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Información básica */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Información General</h3>
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm font-medium text-gray-600">Creado por</label>
-              <p className="text-gray-900">{useCase.createdBy?.name || 'Usuario desconocido'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600">Fecha de creación</label>
-              <p className="text-gray-900">{formatDate(useCase.createdAt)}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600">Última actualización</label>
-              <p className="text-gray-900">{formatDate(useCase.updatedAt)}</p>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Progreso</h3>
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm font-medium text-gray-600">Dominios seleccionados</label>
-              <p className="text-gray-900">{useCase.selectedDomains.length} dominios</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600">APIs seleccionadas</label>
-              <p className="text-gray-900">{useCase.selectedApis.length} APIs</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600">Estado</label>
-              <p className="text-gray-900">{useCase.status}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Texto original */}
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Texto Original</h3>
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <p className="text-gray-700 whitespace-pre-wrap">{useCase.originalText}</p>
+      {/* Header con botones de IA */}
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-gray-900">Resumen del Caso de Uso</h3>
+        <div className="flex gap-2">
+          <button
+            onClick={handleGetContentSuggestions}
+            disabled={isGettingContentSuggestions}
+            className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          >
+            {isGettingContentSuggestions ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Mejorando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                Mejorar Contenido
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleAnalyzeWithAI}
+            disabled={isAnalyzingWithAI}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          >
+            {isAnalyzingWithAI ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Analizando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                Analizar con IA
+              </>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Análisis de IA */}
-      {useCase.aiAnalysis && (
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-blue-600" />
-            Análisis con IA
-          </h3>
-          <div className="bg-blue-50 p-4 rounded-lg space-y-4">
+      {/* Panel de sugerencias de contenido */}
+      {showContentSuggestions && contentSuggestions && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <h4 className="text-lg font-medium text-purple-900">Sugerencias de Mejora</h4>
+            </div>
+            <button
+              onClick={() => setShowContentSuggestions(false)}
+              className="text-purple-600 hover:text-purple-800"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {contentSuggestions.suggestedTitle && (
+              <div className="bg-white p-4 rounded border border-purple-200">
+                <h5 className="font-medium text-purple-900 mb-2">Título Sugerido</h5>
+                <p className="text-sm text-gray-600 mb-2">Actual: {useCase.title}</p>
+                <p className="text-sm text-purple-800 font-medium">Sugerido: {contentSuggestions.suggestedTitle}</p>
+              </div>
+            )}
+
+            {contentSuggestions.suggestedDescription && (
+              <div className="bg-white p-4 rounded border border-purple-200">
+                <h5 className="font-medium text-purple-900 mb-2">Descripción Mejorada</h5>
+                <p className="text-sm text-gray-600 mb-2">Actual: {useCase.description}</p>
+                <p className="text-sm text-purple-800">{contentSuggestions.suggestedDescription}</p>
+              </div>
+            )}
+
+            {contentSuggestions.suggestedObjective && (
+              <div className="bg-white p-4 rounded border border-purple-200">
+                <h5 className="font-medium text-purple-900 mb-2">Objetivo Mejorado</h5>
+                <p className="text-sm text-gray-600 mb-2">Actual: {useCase.objective || 'No especificado'}</p>
+                <p className="text-sm text-purple-800">{contentSuggestions.suggestedObjective}</p>
+              </div>
+            )}
+
+            {contentSuggestions.additionalActors && (
+              <div className="bg-white p-4 rounded border border-purple-200">
+                <h5 className="font-medium text-purple-900 mb-2">Actores Adicionales Sugeridos</h5>
+                <div className="flex flex-wrap gap-2">
+                  {contentSuggestions.additionalActors.map((actor: string, index: number) => (
+                    <span key={index} className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
+                      {actor}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {contentSuggestions.additionalPrerequisites && (
+              <div className="bg-white p-4 rounded border border-purple-200">
+                <h5 className="font-medium text-purple-900 mb-2">Prerrequisitos Adicionales</h5>
+                <ul className="list-disc list-inside text-sm text-purple-800">
+                  {contentSuggestions.additionalPrerequisites.map((prereq: string, index: number) => (
+                    <li key={index}>{prereq}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-3 mt-4">
+            <button
+              onClick={() => {
+                // Aquí podrías implementar la lógica para aplicar las sugerencias
+                alert('Funcionalidad de aplicar sugerencias - implementar según necesidades específicas');
+                setShowContentSuggestions(false);
+              }}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm"
+            >
+              Aplicar Sugerencias
+            </button>
+            <button
+              onClick={() => setShowContentSuggestions(false)}
+              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Panel de análisis de IA */}
+      {showAiAnalysis && aiAnalysis && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-blue-600" />
+              <h4 className="text-lg font-medium text-blue-900">Análisis de IA</h4>
+            </div>
+            <button
+              onClick={() => setShowAiAnalysis(false)}
+              className="text-blue-600 hover:text-blue-800"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <h4 className="font-medium text-blue-900 mb-2">Resumen</h4>
-              <p className="text-blue-800">{useCase.aiAnalysis.summary}</p>
+              <h5 className="font-medium text-blue-900 mb-2">Dominios Sugeridos</h5>
+              <div className="space-y-1">
+                {(aiAnalysis.suggestedDomains || []).map((domain: string, index: number) => (
+                  <div key={index} className="text-blue-800 text-sm">• {domain}</div>
+                ))}
+              </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h4 className="font-medium text-blue-900 mb-2">Entidades Clave</h4>
-                <div className="flex flex-wrap gap-2">
-                  {useCase.aiAnalysis.keyEntities.map((entity, index) => (
-                    <span key={index} className="bg-blue-200 text-blue-800 px-2 py-1 rounded text-sm">
-                      {entity}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              
-              <div>
-                <h4 className="font-medium text-blue-900 mb-2">Procesos de Negocio</h4>
-                <div className="flex flex-wrap gap-2">
-                  {useCase.aiAnalysis.businessProcesses.map((process, index) => (
-                    <span key={index} className="bg-blue-200 text-blue-800 px-2 py-1 rounded text-sm">
-                      {process}
-                    </span>
-                  ))}
-                </div>
-              </div>
+            <div>
+              <h5 className="font-medium text-blue-900 mb-2">Complejidad</h5>
+              <span className={`px-2 py-1 rounded text-sm font-medium ${
+                aiAnalysis.complexity === 'high' ? 'bg-red-200 text-red-800' :
+                aiAnalysis.complexity === 'medium' ? 'bg-yellow-200 text-yellow-800' :
+                'bg-green-200 text-green-800'
+              }`}>
+                {aiAnalysis.complexity === 'high' ? 'Alta' :
+                 aiAnalysis.complexity === 'medium' ? 'Media' : 'Baja'}
+              </span>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <h4 className="font-medium text-blue-900 mb-2">Dominios Sugeridos</h4>
-                <div className="space-y-1">
-                  {useCase.aiAnalysis.suggestedDomains.map((domain, index) => (
-                    <div key={index} className="text-blue-800 text-sm">• {domain}</div>
-                  ))}
+            
+            <div>
+              <h5 className="font-medium text-blue-900 mb-2">Confianza</h5>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-blue-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full" 
+                    style={{ width: `${aiAnalysis.confidence || 0}%` }}
+                  />
                 </div>
-              </div>
-              
-              <div>
-                <h4 className="font-medium text-blue-900 mb-2">Complejidad</h4>
-                <span className={`px-2 py-1 rounded text-sm font-medium ${
-                  useCase.aiAnalysis.complexity === 'high' ? 'bg-red-200 text-red-800' :
-                  useCase.aiAnalysis.complexity === 'medium' ? 'bg-yellow-200 text-yellow-800' :
-                  'bg-green-200 text-green-800'
-                }`}>
-                  {useCase.aiAnalysis.complexity === 'high' ? 'Alta' :
-                   useCase.aiAnalysis.complexity === 'medium' ? 'Media' : 'Baja'}
+                <span className="text-blue-800 text-sm font-medium">
+                  {aiAnalysis.confidence || 0}%
                 </span>
               </div>
-              
-              <div>
-                <h4 className="font-medium text-blue-900 mb-2">Confianza</h4>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-blue-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full" 
-                      style={{ width: `${useCase.aiAnalysis.confidence}%` }}
-                    />
-                  </div>
-                  <span className="text-blue-800 text-sm font-medium">
-                    {useCase.aiAnalysis.confidence}%
+            </div>
+          </div>
+
+          {aiAnalysis.summary && (
+            <div className="mt-4">
+              <h5 className="font-medium text-blue-900 mb-2">Resumen del Análisis</h5>
+              <p className="text-blue-800 text-sm">{aiAnalysis.summary}</p>
+            </div>
+          )}
+
+          {(aiAnalysis.keyEntities && aiAnalysis.keyEntities.length > 0) && (
+            <div className="mt-4">
+              <h5 className="font-medium text-blue-900 mb-2">Entidades Clave</h5>
+              <div className="flex flex-wrap gap-2">
+                {aiAnalysis.keyEntities.map((entity: string, index: number) => (
+                  <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                    {entity}
                   </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(aiAnalysis.businessProcesses && aiAnalysis.businessProcesses.length > 0) && (
+            <div className="mt-4">
+              <h5 className="font-medium text-blue-900 mb-2">Procesos de Negocio</h5>
+              <ul className="list-disc list-inside text-sm text-blue-800">
+                {aiAnalysis.businessProcesses.map((process: string, index: number) => (
+                  <li key={index}>{process}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Información básica del caso de uso */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="font-medium text-gray-900 mb-2">Información Básica</h4>
+          <div className="space-y-3">
+            <div>
+              <span className="text-sm font-medium text-gray-700">Estado:</span>
+              <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+                useCase.status === 'completed' ? 'bg-green-100 text-green-800' :
+                useCase.status === 'analyzing' ? 'bg-blue-100 text-blue-800' :
+                useCase.status === 'draft' ? 'bg-gray-100 text-gray-800' :
+                'bg-yellow-100 text-yellow-800'
+              }`}>
+                {useCase.status === 'completed' ? 'Completado' :
+                 useCase.status === 'analyzing' ? 'Analizando' :
+                 useCase.status === 'draft' ? 'Borrador' :
+                 useCase.status}
+              </span>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-gray-700">Prioridad:</span>
+              <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+                useCase.priority === 'critical' ? 'bg-red-100 text-red-800' :
+                useCase.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                useCase.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-green-100 text-green-800'
+              }`}>
+                {useCase.priority === 'critical' ? 'Crítica' :
+                 useCase.priority === 'high' ? 'Alta' :
+                 useCase.priority === 'medium' ? 'Media' :
+                 'Baja'}
+              </span>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-gray-700">Complejidad:</span>
+              <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+                useCase.complexity === 'high' ? 'bg-red-100 text-red-800' :
+                useCase.complexity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-green-100 text-green-800'
+              }`}>
+                {useCase.complexity === 'high' ? 'Alta' :
+                 useCase.complexity === 'medium' ? 'Media' :
+                 'Baja'}
+              </span>
+            </div>
+            {useCase.estimatedEffort && (
+              <div>
+                <span className="text-sm font-medium text-gray-700">Esfuerzo Estimado:</span>
+                <span className="ml-2 text-sm text-gray-600">{useCase.estimatedEffort}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="font-medium text-gray-900 mb-2">Progreso</h4>
+          <div className="space-y-3">
+            <div>
+              <span className="text-sm font-medium text-gray-700">Dominios BIAN:</span>
+              <span className="ml-2 text-sm text-gray-600">
+                {useCase.selectedDomains.length} seleccionados
+              </span>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-gray-700">APIs:</span>
+              <span className="ml-2 text-sm text-gray-600">
+                {(useCase.selectedApis || []).length} seleccionadas
+              </span>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-gray-700">Última actualización:</span>
+              <span className="ml-2 text-sm text-gray-600">
+                {new Date(useCase.updatedAt).toLocaleDateString('es-ES')}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Objetivo */}
+      {useCase.objective && (
+        <div>
+          <h4 className="font-medium text-gray-900 mb-2">Objetivo</h4>
+          <p className="text-gray-700 bg-gray-50 p-3 rounded-lg">{useCase.objective}</p>
+        </div>
+      )}
+
+      {/* Actores */}
+      {(useCase.actors?.primary?.length > 0 || useCase.actors?.secondary?.length > 0 || useCase.actors?.systems?.length > 0) && (
+        <div>
+          <h4 className="font-medium text-gray-900 mb-3">Actores</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {useCase.actors?.primary && useCase.actors.primary.length > 0 && (
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <h5 className="text-sm font-medium text-blue-900 mb-2">Primarios</h5>
+                <ul className="space-y-1">
+                  {useCase.actors.primary.map((actor, index) => (
+                    <li key={index} className="text-sm text-blue-800">• {actor}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {useCase.actors?.secondary && useCase.actors.secondary.length > 0 && (
+              <div className="bg-green-50 p-3 rounded-lg">
+                <h5 className="text-sm font-medium text-green-900 mb-2">Secundarios</h5>
+                <ul className="space-y-1">
+                  {useCase.actors.secondary.map((actor, index) => (
+                    <li key={index} className="text-sm text-green-800">• {actor}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {useCase.actors?.systems && useCase.actors.systems.length > 0 && (
+              <div className="bg-purple-50 p-3 rounded-lg">
+                <h5 className="text-sm font-medium text-purple-900 mb-2">Sistemas</h5>
+                <ul className="space-y-1">
+                  {useCase.actors.systems.map((system, index) => (
+                    <li key={index} className="text-sm text-purple-800">• {system}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Prerrequisitos */}
+      {useCase.prerequisites && useCase.prerequisites.length > 0 && (
+        <div>
+          <h4 className="font-medium text-gray-900 mb-2">Prerrequisitos</h4>
+          <ul className="space-y-1 bg-gray-50 p-3 rounded-lg">
+            {useCase.prerequisites.map((prereq, index) => (
+              <li key={index} className="text-sm text-gray-700">• {prereq}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Flujo Principal */}
+      {useCase.mainFlow && useCase.mainFlow.length > 0 && (
+        <div>
+          <h4 className="font-medium text-gray-900 mb-2">Flujo Principal</h4>
+          <div className="space-y-2 bg-gray-50 p-3 rounded-lg">
+            {useCase.mainFlow.map((step, index) => (
+              <div key={index} className="flex gap-3">
+                <span className="text-sm font-medium text-blue-600 min-w-[2rem]">{step.step}.</span>
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-gray-900">{step.actor}:</span>
+                  <span className="text-sm text-gray-700 ml-1">{step.description}</span>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Postcondiciones */}
+      {useCase.postconditions && useCase.postconditions.length > 0 && (
+        <div>
+          <h4 className="font-medium text-gray-900 mb-2">Postcondiciones</h4>
+          <ul className="space-y-1 bg-gray-50 p-3 rounded-lg">
+            {useCase.postconditions.map((postcond, index) => (
+              <li key={index} className="text-sm text-gray-700">• {postcond}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Reglas de Negocio */}
+      {useCase.businessRules && useCase.businessRules.length > 0 && (
+        <div>
+          <h4 className="font-medium text-gray-900 mb-2">Reglas de Negocio</h4>
+          <ul className="space-y-1 bg-gray-50 p-3 rounded-lg">
+            {useCase.businessRules.map((rule, index) => (
+              <li key={index} className="text-sm text-gray-700">• {rule}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Análisis de IA existente */}
+      {useCase.aiAnalysis && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="h-5 w-5 text-blue-600" />
+            <h4 className="text-lg font-medium text-blue-900">Análisis de IA Previo</h4>
+          </div>
+
+          {useCase.aiAnalysis.summary && (
+            <div className="mb-4">
+              <h5 className="font-medium text-blue-900 mb-2">Resumen</h5>
+              <p className="text-blue-800 text-sm">{useCase.aiAnalysis.summary}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <h5 className="font-medium text-blue-900 mb-2">Dominios Sugeridos</h5>
+              <div className="space-y-1">
+                {useCase.aiAnalysis.suggestedDomains.map((domain, index) => (
+                  <div key={index} className="text-blue-800 text-sm">• {domain}</div>
+                ))}
+              </div>
+            </div>
+            
+            <div>
+              <h5 className="font-medium text-blue-900 mb-2">Complejidad</h5>
+              <span className={`px-2 py-1 rounded text-sm font-medium ${
+                useCase.aiAnalysis.complexity === 'high' ? 'bg-red-200 text-red-800' :
+                useCase.aiAnalysis.complexity === 'medium' ? 'bg-yellow-200 text-yellow-800' :
+                'bg-green-200 text-green-800'
+              }`}>
+                {useCase.aiAnalysis.complexity === 'high' ? 'Alta' :
+                 useCase.aiAnalysis.complexity === 'medium' ? 'Media' : 'Baja'}
+              </span>
+            </div>
+            
+            <div>
+              <h5 className="font-medium text-blue-900 mb-2">Confianza</h5>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-blue-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full" 
+                    style={{ width: `${useCase.aiAnalysis.confidence}%` }}
+                  />
+                </div>
+                <span className="text-blue-800 text-sm font-medium">
+                  {useCase.aiAnalysis.confidence}%
+                </span>
               </div>
             </div>
           </div>
@@ -555,8 +928,12 @@ const DomainsTab: React.FC<{
   domains: BianDomain[];
   onSelectDomains: (domains: string[]) => void;
   isLoading: boolean;
-}> = ({ useCase, domains, onSelectDomains, isLoading }) => {
+  queryClient: any;
+}> = ({ useCase, domains, onSelectDomains, isLoading, queryClient }) => {
   const [selectedDomains, setSelectedDomains] = useState<string[]>(useCase.selectedDomains);
+  const [isGettingDomainSuggestions, setIsGettingDomainSuggestions] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState<any>(null);
+  const [showAiSuggestions, setShowAiSuggestions] = useState(false);
 
   const handleDomainToggle = (domainName: string) => {
     setSelectedDomains(prev => 
@@ -570,23 +947,192 @@ const DomainsTab: React.FC<{
     onSelectDomains(selectedDomains);
   };
 
+  // Función para obtener sugerencias de IA de dominios
+  const handleGetDomainSuggestions = async () => {
+    setIsGettingDomainSuggestions(true);
+    try {
+      const analysisText = `
+TÍTULO: ${useCase.title}
+OBJETIVO: ${useCase.objective || ''}
+DESCRIPCIÓN: ${useCase.description}
+ACTORES: ${useCase.actors?.primary?.join(', ') || ''}
+PRERREQUISITOS: ${useCase.prerequisites?.join(', ') || ''}
+FLUJO PRINCIPAL: ${useCase.mainFlow?.map((s: any) => `${s.step}. ${s.description}`).join(', ') || ''}
+      `.trim();
+
+      const response = await useCaseService.recommendDomains(analysisText);
+      const aiData = (response.data as any).data;
+      setAiRecommendations(aiData);
+      setShowAiSuggestions(true);
+    } catch (error) {
+      console.error('Error obteniendo sugerencias de dominios:', error);
+      alert('Error al obtener sugerencias de dominios. Por favor intenta de nuevo.');
+    } finally {
+      setIsGettingDomainSuggestions(false);
+    }
+  };
+
+  // Función para aplicar sugerencias de IA
+  const applyAiSuggestions = async () => {
+    if (aiRecommendations?.suggestedDomains) {
+      console.log('=== APLICANDO SUGERENCIAS DE DOMINIOS ===');
+      console.log('Dominios sugeridos por IA:', aiRecommendations.suggestedDomains);
+      console.log('Dominios disponibles actuales:', domains.map(d => d.name));
+
+      const suggestedDomains = aiRecommendations.suggestedDomains;
+      const existingDomainNames = domains.map(d => d.name);
+      
+      // Encontrar dominios nuevos que no están en la lista
+      const newDomains = suggestedDomains.filter((domain: string) => !existingDomainNames.includes(domain));
+      console.log('Dominios nuevos a agregar:', newDomains);
+
+      // Si hay dominios nuevos, agregarlos a la lista de dominios disponibles
+      if (newDomains.length > 0) {
+        console.log(`Agregando ${newDomains.length} dominios nuevos a la lista`);
+        
+        try {
+          // Crear objetos de dominio para los nuevos dominios
+          const newDomainObjects = newDomains.map((domainName: string) => ({
+            name: domainName,
+            description: `Dominio sugerido por IA: ${domainName}`,
+            businessArea: 'IA Suggested'
+          }));
+
+          // Llamar al backend para crear los dominios dinámicamente
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/bian/domains`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token') || 'dummy-token-for-development'}`
+            },
+            body: JSON.stringify({
+              domains: newDomainObjects
+            })
+          });
+
+                     if (response.ok) {
+             const result = await response.json();
+             console.log('Dominios creados exitosamente en el backend:', result.data);
+             
+             // Forzar recarga de los dominios para que aparezcan en la lista
+             console.log('Forzando recarga de dominios...');
+             queryClient.invalidateQueries({ queryKey: ['bianDomains'] });
+             
+             // Mostrar mensaje de éxito al usuario
+             alert(`Se agregaron ${newDomains.length} dominios nuevos sugeridos por IA: ${newDomains.join(', ')}`);
+           } else {
+            console.error('Error creando dominios en el backend');
+            // Aún así, continuar con la selección local
+            alert(`Se seleccionaron los dominios sugeridos, pero algunos pueden no estar en la lista base: ${newDomains.join(', ')}`);
+          }
+        } catch (error) {
+          console.error('Error al crear dominios dinámicamente:', error);
+          // Aún así, continuar con la selección local
+          alert(`Se seleccionaron los dominios sugeridos, pero algunos pueden no estar en la lista base: ${newDomains.join(', ')}`);
+        }
+      }
+
+      // Seleccionar todos los dominios sugeridos (tanto existentes como nuevos)
+      setSelectedDomains(suggestedDomains);
+      setShowAiSuggestions(false);
+      
+      console.log('Dominios finalmente seleccionados:', suggestedDomains);
+    }
+  };
+
   const hasChanges = JSON.stringify(selectedDomains.sort()) !== JSON.stringify(useCase.selectedDomains.sort());
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-900">Dominios BIAN</h3>
-        {hasChanges && (
+        <div className="flex gap-2">
+          {/* Botón de sugerencias de IA */}
           <button
-            onClick={handleSave}
-            disabled={isLoading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+            onClick={handleGetDomainSuggestions}
+            disabled={isGettingDomainSuggestions}
+            className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-4 py-2 rounded-lg flex items-center gap-2"
           >
-            {isLoading ? <LoadingSpinner /> : <Save className="h-4 w-4" />}
-            Guardar Selección
+            {isGettingDomainSuggestions ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Analizando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                Sugerir con IA
+              </>
+            )}
           </button>
-        )}
+          {hasChanges && (
+            <button
+              onClick={handleSave}
+              disabled={isLoading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+            >
+              {isLoading ? <LoadingSpinner /> : <Save className="h-4 w-4" />}
+              Guardar Selección
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Panel de sugerencias de IA */}
+      {showAiSuggestions && aiRecommendations && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <h4 className="text-lg font-medium text-purple-900">Sugerencias de IA</h4>
+            </div>
+            <button
+              onClick={() => setShowAiSuggestions(false)}
+              className="text-purple-600 hover:text-purple-800"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {aiRecommendations.reasoning && (
+            <div className="mb-4">
+              <h5 className="font-medium text-purple-900 mb-2">Análisis:</h5>
+              <p className="text-purple-800 text-sm">{aiRecommendations.reasoning}</p>
+            </div>
+          )}
+
+          {aiRecommendations.suggestedDomains && (
+            <div className="mb-4">
+              <h5 className="font-medium text-purple-900 mb-2">Dominios Recomendados:</h5>
+              <div className="flex flex-wrap gap-2">
+                {aiRecommendations.suggestedDomains.map((domain: string) => (
+                  <span
+                    key={domain}
+                    className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm"
+                  >
+                    {domain}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={applyAiSuggestions}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm"
+            >
+              Aplicar Sugerencias
+            </button>
+            <button
+              onClick={() => setShowAiSuggestions(false)}
+              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {domains.map((domain) => (
@@ -634,6 +1180,9 @@ const ApisTab: React.FC<{
 }> = ({ useCase, onSelectApis, isLoading }) => {
   const [selectedApis, setSelectedApis] = useState<string[]>(useCase.selectedApis || []);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isGettingApiSuggestions, setIsGettingApiSuggestions] = useState(false);
+  const [aiApiSuggestions, setAiApiSuggestions] = useState<any>(null);
+  const [showApiSuggestions, setShowApiSuggestions] = useState(false);
 
   // Verificar cambios
   useEffect(() => {
@@ -652,6 +1201,171 @@ const ApisTab: React.FC<{
 
   const handleSave = () => {
     onSelectApis(selectedApis);
+  };
+
+  // Función para obtener sugerencias de IA de APIs
+  const handleGetApiSuggestions = async () => {
+    if (useCase.selectedDomains.length === 0) {
+      alert('Por favor selecciona dominios primero antes de obtener sugerencias de APIs');
+      return;
+    }
+
+    setIsGettingApiSuggestions(true);
+    try {
+      const useCaseContext = `
+TÍTULO: ${useCase.title}
+DESCRIPCIÓN: ${useCase.description}
+OBJETIVO: ${useCase.objective || ''}
+DOMINIOS SELECCIONADOS: ${useCase.selectedDomains.join(', ')}
+      `.trim();
+
+      const response = await useCaseService.aiSuggestApis({
+        domains: useCase.selectedDomains,
+        useCaseContext
+      });
+      
+      const aiData = (response.data as any).data;
+      setAiApiSuggestions(aiData);
+      setShowApiSuggestions(true);
+    } catch (error) {
+      console.error('Error obteniendo sugerencias de APIs:', error);
+      alert('Error al obtener sugerencias de APIs. Por favor intenta de nuevo.');
+    } finally {
+      setIsGettingApiSuggestions(false);
+    }
+  };
+
+  // Función para aplicar sugerencias de IA de APIs
+  const applyApiSuggestions = async () => {
+    if (aiApiSuggestions?.suggestedApis) {
+      console.log('=== APLICANDO SUGERENCIAS DE IA ===');
+      console.log('APIs sugeridas por IA:', aiApiSuggestions.suggestedApis);
+      console.log('APIs disponibles:', apis);
+      console.log('APIs actualmente seleccionadas:', selectedApis);
+
+      const suggestedApiNames = aiApiSuggestions.suggestedApis.map((api: any) => api.name || api);
+      console.log('Nombres de APIs sugeridas:', suggestedApiNames);
+
+      // Obtener lista de APIs disponibles para comparar
+      const availableApiNames = apis.map(api => api.name);
+      console.log('Nombres de APIs disponibles:', availableApiNames);
+
+      // Función para encontrar coincidencias
+      const findMatchingApis = (suggestedNames: string[], availableNames: string[]) => {
+        const matches: string[] = [];
+        
+        suggestedNames.forEach(suggestedName => {
+          // Buscar coincidencia exacta primero
+          const exactMatch = availableNames.find(available => available === suggestedName);
+          if (exactMatch) {
+            matches.push(exactMatch);
+            return;
+          }
+
+          // Buscar coincidencia parcial (contiene)
+          const partialMatch = availableNames.find(available => 
+            available.toLowerCase().includes(suggestedName.toLowerCase()) ||
+            suggestedName.toLowerCase().includes(available.toLowerCase())
+          );
+          if (partialMatch) {
+            matches.push(partialMatch);
+            return;
+          }
+
+          console.warn(`No se encontró coincidencia para API sugerida: ${suggestedName}`);
+        });
+
+        return matches;
+      };
+
+      const matchingApis = findMatchingApis(suggestedApiNames, availableApiNames);
+      console.log('APIs que coinciden y se van a seleccionar:', matchingApis);
+
+      // Encontrar APIs nuevas que no están en la lista disponible
+      const newApis = aiApiSuggestions.suggestedApis.filter((api: any) => 
+        !availableApiNames.includes(api.name)
+      );
+      console.log('APIs nuevas a crear:', newApis);
+
+      // Si hay APIs nuevas, crearlas dinámicamente
+      if (newApis.length > 0) {
+        console.log(`Creando ${newApis.length} APIs nuevas dinámicamente`);
+        
+        try {
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/bian/apis/create`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token') || 'dummy-token-for-development'}`
+            },
+            body: JSON.stringify({
+              apis: newApis.map((api: any) => ({
+                name: api.name,
+                domain: api.domain,
+                description: api.reason || `API sugerida por IA: ${api.name}`
+              }))
+            })
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log('APIs creadas exitosamente en el backend:', result.data);
+            
+            // Agregar las APIs nuevas a la lista de APIs coincidentes
+            const newApiNames = newApis.map((api: any) => api.name);
+            const allMatchingApis = [...matchingApis, ...newApiNames];
+            
+            // Combinar APIs ya seleccionadas con las nuevas
+            const newSelectedApis = [...new Set([...selectedApis, ...allMatchingApis])];
+            console.log('Nueva selección final (incluyendo APIs creadas):', newSelectedApis);
+
+            setSelectedApis(newSelectedApis);
+            setShowApiSuggestions(false);
+
+            // Mostrar mensaje de éxito
+            alert(`Se aplicaron ${allMatchingApis.length} APIs sugeridas (${newApis.length} creadas dinámicamente): ${allMatchingApis.join(', ')}`);
+          } else {
+            console.error('Error creando APIs en el backend');
+            // Continuar solo con las APIs que coincidieron
+            const newSelectedApis = [...new Set([...selectedApis, ...matchingApis])];
+            setSelectedApis(newSelectedApis);
+            setShowApiSuggestions(false);
+            
+            if (matchingApis.length > 0) {
+              alert(`Se aplicaron ${matchingApis.length} APIs existentes: ${matchingApis.join(', ')}. ${newApis.length} APIs no pudieron crearse.`);
+            } else {
+              alert('No se encontraron APIs coincidentes y no se pudieron crear APIs nuevas.');
+            }
+          }
+        } catch (error) {
+          console.error('Error al crear APIs dinámicamente:', error);
+          // Continuar solo con las APIs que coincidieron
+          const newSelectedApis = [...new Set([...selectedApis, ...matchingApis])];
+          setSelectedApis(newSelectedApis);
+          setShowApiSuggestions(false);
+          
+          if (matchingApis.length > 0) {
+            alert(`Se aplicaron ${matchingApis.length} APIs existentes: ${matchingApis.join(', ')}. Error al crear APIs nuevas.`);
+          } else {
+            alert('No se encontraron APIs coincidentes y ocurrió un error al crear APIs nuevas.');
+          }
+        }
+      } else {
+        // No hay APIs nuevas, solo aplicar las que coincidieron
+        const newSelectedApis = [...new Set([...selectedApis, ...matchingApis])];
+        console.log('Nueva selección final:', newSelectedApis);
+
+        setSelectedApis(newSelectedApis);
+        setShowApiSuggestions(false);
+
+        // Mostrar mensaje de éxito
+        if (matchingApis.length > 0) {
+          alert(`Se aplicaron ${matchingApis.length} APIs sugeridas: ${matchingApis.join(', ')}`);
+        } else {
+          alert('No se encontraron APIs coincidentes en la lista actual. Verifica que los dominios correctos estén seleccionados.');
+        }
+      }
+    }
   };
 
   // Consultar APIs para los dominios seleccionados
@@ -686,17 +1400,93 @@ const ApisTab: React.FC<{
             Selecciona las APIs BIAN que consideras usar para resolver el caso de uso
           </p>
         </div>
-        {hasChanges && (
+        <div className="flex gap-2">
+          {/* Botón de sugerencias de IA para APIs */}
           <button
-            onClick={handleSave}
-            disabled={isLoading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+            onClick={handleGetApiSuggestions}
+            disabled={isGettingApiSuggestions}
+            className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-4 py-2 rounded-lg flex items-center gap-2"
           >
-            {isLoading ? <LoadingSpinner /> : <Save className="h-4 w-4" />}
-            Guardar Selección
+            {isGettingApiSuggestions ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Analizando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                Sugerir APIs con IA
+              </>
+            )}
           </button>
-        )}
+          {hasChanges && (
+            <button
+              onClick={handleSave}
+              disabled={isLoading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+            >
+              {isLoading ? <LoadingSpinner /> : <Save className="h-4 w-4" />}
+              Guardar Selección
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Panel de sugerencias de IA para APIs */}
+      {showApiSuggestions && aiApiSuggestions && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <h4 className="text-lg font-medium text-purple-900">Sugerencias de APIs</h4>
+            </div>
+            <button
+              onClick={() => setShowApiSuggestions(false)}
+              className="text-purple-600 hover:text-purple-800"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {aiApiSuggestions.reasoning && (
+            <div className="mb-4">
+              <h5 className="font-medium text-purple-900 mb-2">Análisis:</h5>
+              <p className="text-purple-800 text-sm">{aiApiSuggestions.reasoning}</p>
+            </div>
+          )}
+
+          {aiApiSuggestions.suggestedApis && (
+            <div className="mb-4">
+              <h5 className="font-medium text-purple-900 mb-2">APIs Recomendadas:</h5>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {aiApiSuggestions.suggestedApis.map((api: any, index: number) => (
+                  <div key={index} className="bg-white p-3 rounded border border-purple-200">
+                    <h6 className="font-medium text-gray-900">{api.name || api}</h6>
+                    {api.reason && (
+                      <p className="text-sm text-gray-600 mt-1">{api.reason}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={applyApiSuggestions}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm"
+            >
+              Aplicar Sugerencias
+            </button>
+            <button
+              onClick={() => setShowApiSuggestions(false)}
+              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         {apis.map((api) => (
@@ -709,81 +1499,36 @@ const ApisTab: React.FC<{
             }`}
             onClick={() => handleApiToggle(api.name)}
           >
-            <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-2">
                   <h4 className="font-medium text-gray-900">{api.name}</h4>
                   <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                    {api.operationType}
-                  </span>
-                  <span className={`text-xs px-2 py-1 rounded font-medium ${
-                    api.method === 'GET' ? 'bg-green-100 text-green-800' :
-                    api.method === 'POST' ? 'bg-blue-100 text-blue-800' :
-                    api.method === 'PUT' ? 'bg-yellow-100 text-yellow-800' :
-                    api.method === 'DELETE' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {api.method}
+                    {api.domain}
                   </span>
                 </div>
-                <p className="text-sm text-gray-600 mb-2">{api.description}</p>
-                <div className="text-xs text-gray-500 mb-2">
-                  <span className="font-medium">Dominio:</span> {api.domain} | 
-                  <span className="font-medium"> Endpoint:</span> <code className="bg-gray-100 px-1 rounded">{api.endpoint}</code>
-                </div>
-                
-                {/* Mostrar métodos disponibles */}
-                {selectedApis.includes(api.name) && api.availableMethods && api.availableMethods.length > 1 && (
-                  <div className="text-xs text-gray-500 mt-2">
-                    <span className="font-medium">Métodos disponibles:</span>
-                    <div className="flex gap-1 mt-1">
-                      {api.availableMethods.map((method, idx) => (
-                        <span key={idx} className={`px-2 py-1 rounded text-xs ${
-                          method === 'GET' ? 'bg-green-100 text-green-700' :
-                          method === 'POST' ? 'bg-blue-100 text-blue-700' :
-                          method === 'PUT' ? 'bg-yellow-100 text-yellow-700' :
-                          method === 'DELETE' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {method}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                {api.description && (
+                  <p className="text-sm text-gray-600 mb-2">{api.description}</p>
                 )}
-                
-                {/* Mostrar parámetros */}
-                {selectedApis.includes(api.name) && api.parameters && api.parameters.length > 0 && (
-                  <div className="text-xs text-gray-500 mt-2">
-                    <span className="font-medium">Parámetros:</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {api.parameters.slice(0, 3).map((param, idx) => (
-                        <span key={idx} className="bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                          {param.name} ({param.type})
-                        </span>
-                      ))}
-                      {api.parameters.length > 3 && (
-                        <span className="text-gray-500">+{api.parameters.length - 3} más</span>
-                      )}
-                    </div>
-                  </div>
+                {api.reason && (
+                  <p className="text-xs text-blue-600">💡 {api.reason}</p>
                 )}
               </div>
               {selectedApis.includes(api.name) && (
-                <CheckCircle className="h-5 w-5 text-blue-600 ml-2" />
+                <CheckCircle className="h-5 w-5 text-blue-600 ml-4" />
               )}
             </div>
           </div>
         ))}
-      </div>
 
-      {apis.length === 0 && (
-        <div className="text-center py-8">
-          <Code className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay APIs disponibles</h3>
-          <p className="text-gray-600">No se encontraron APIs para los dominios seleccionados.</p>
-        </div>
-      )}
+        {apis.length === 0 && (
+          <div className="text-center py-8">
+            <Code className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No hay APIs disponibles</h3>
+            <p className="text-gray-600">No se encontraron APIs para los dominios seleccionados.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -1272,7 +2017,7 @@ tags:
       const firstApi = selectedApis[0];
       setSelectedApi(firstApi.name);
       const firstMethod = firstApi.availableMethods?.[0] || firstApi.method;
-      setSelectedMethod(firstMethod);
+      setSelectedMethod(firstMethod || '');
     }
   }, [selectedApis, selectedApi]);
 

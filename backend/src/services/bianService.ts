@@ -197,6 +197,85 @@ class BianService {
     return this.domains.find(domain => domain.name === name) || null;
   }
 
+  async createDomains(newDomains: { name: string; description: string; businessArea?: string }[]): Promise<BianDomain[]> {
+    const createdDomains: BianDomain[] = [];
+
+    for (const domainData of newDomains) {
+      // Verificar si el dominio ya existe
+      const existingDomain = this.domains.find(d => d.name === domainData.name);
+      
+      if (!existingDomain) {
+        const newDomain: BianDomain = {
+          name: domainData.name,
+          description: domainData.description,
+          businessAreas: [domainData.businessArea || 'AI-Suggested'],
+          commonApis: [`${domainData.name} API`] // API genérica para el dominio
+        };
+
+        // Agregar el dominio a la lista en memoria
+        this.domains.push(newDomain);
+        createdDomains.push(newDomain);
+
+        logger.info(`Dominio creado dinámicamente: ${domainData.name}`);
+      } else {
+        logger.info(`Dominio ya existe: ${domainData.name}`);
+        createdDomains.push(existingDomain);
+      }
+    }
+
+    return createdDomains;
+  }
+
+  async createApis(newApis: { name: string; domain: string; description: string }[]): Promise<BianApi[]> {
+    const createdApis: BianApi[] = [];
+
+    for (const apiData of newApis) {
+      // Verificar si la API ya existe
+      const existingApi = this.apiTemplates[apiData.name];
+      
+      if (!existingApi) {
+        const newApi: BianApi = {
+          name: apiData.name,
+          domain: apiData.domain,
+          description: apiData.description,
+          endpoints: [
+            {
+              path: `/${apiData.name.toLowerCase().replace(/\s+/g, '-')}/initiate`,
+              method: 'POST',
+              operation: 'Initiate',
+              description: `Iniciar operación de ${apiData.name}`
+            },
+            {
+              path: `/${apiData.name.toLowerCase().replace(/\s+/g, '-')}/{id}/retrieve`,
+              method: 'GET',
+              operation: 'Retrieve',
+              description: `Obtener información de ${apiData.name}`
+            },
+            {
+              path: `/${apiData.name.toLowerCase().replace(/\s+/g, '-')}/{id}/update`,
+              method: 'PUT',
+              operation: 'Update',
+              description: `Actualizar ${apiData.name}`
+            }
+          ],
+          coverage: [`operaciones de ${apiData.domain}`, 'gestión básica', 'consultas'],
+          limitations: ['API generada automáticamente por IA', 'funcionalidad básica']
+        };
+
+        // Agregar la API a los templates en memoria
+        this.apiTemplates[apiData.name] = newApi;
+        createdApis.push(newApi);
+
+        logger.info(`API creada dinámicamente: ${apiData.name} para dominio ${apiData.domain}`);
+      } else {
+        logger.info(`API ya existe: ${apiData.name}`);
+        createdApis.push(existingApi);
+      }
+    }
+
+    return createdApis;
+  }
+
   async getApisForDomains(domainNames: string[], useCaseContext?: string): Promise<any[]> {
     try {
       const selectedDomains = this.domains.filter(domain => 
@@ -207,11 +286,21 @@ class BianService {
 
       // Obtener APIs básicas para los dominios seleccionados
       for (const domain of selectedDomains) {
+        // Buscar en las APIs comunes del dominio
         for (const apiName of domain.commonApis) {
           const apiTemplate = this.apiTemplates[apiName];
           if (apiTemplate) {
             suggestedApis.push({ ...apiTemplate });
           }
+        }
+      }
+
+      // Buscar también en todos los apiTemplates que coincidan con los dominios seleccionados
+      // Esto incluye las APIs creadas dinámicamente
+      for (const [apiName, apiTemplate] of Object.entries(this.apiTemplates)) {
+        if (domainNames.includes(apiTemplate.domain) && 
+            !suggestedApis.some(api => api.name === apiTemplate.name)) {
+          suggestedApis.push({ ...apiTemplate });
         }
       }
 

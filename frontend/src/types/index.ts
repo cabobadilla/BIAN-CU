@@ -88,6 +88,7 @@ export interface BianApi {
   }[];
   requestSchema?: Record<string, unknown>;
   responseSchema?: Record<string, unknown>;
+  reason?: string;
 }
 
 export interface CustomSchema {

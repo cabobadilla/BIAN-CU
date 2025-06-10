@@ -7,7 +7,25 @@ import { bianService } from '../services/bianService';
 const router = express.Router();
 
 // Middleware de autenticación para todas las rutas
-router.use(passport.authenticate('jwt', { session: false }));
+// TEMPORAL: Para desarrollo, bypasear autenticación con token dummy
+router.use((req: Request, res: Response, next: any) => {
+  const authHeader = req.headers.authorization;
+  
+  if (authHeader && authHeader.includes('dummy-token-for-development')) {
+    // Simular usuario autenticado para desarrollo
+    req.user = {
+      _id: '507f1f77bcf86cd799439011', // ObjectId falso pero válido
+      email: 'dev@example.com',
+      name: 'Developer User',
+      companyId: '507f1f77bcf86cd799439012', // ObjectId falso pero válido
+      role: 'admin'
+    };
+    return next();
+  }
+  
+  // Si no es token dummy, usar autenticación normal
+  return passport.authenticate('jwt', { session: false })(req, res, next);
+});
 
 /**
  * @swagger
@@ -86,6 +104,122 @@ router.get('/domains/:domainName',
     res.json({
       success: true,
       data: domain
+    });
+  })
+);
+
+/**
+ * @swagger
+ * /api/v1/bian/domains:
+ *   post:
+ *     summary: Crear dominios BIAN dinámicamente (sugeridos por IA)
+ *     tags: [BIAN]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - domains
+ *             properties:
+ *               domains:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     businessArea:
+ *                       type: string
+ *     responses:
+ *       201:
+ *         description: Dominios creados exitosamente
+ */
+router.post('/domains',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { domains } = req.body;
+
+    if (!domains || !Array.isArray(domains) || domains.length === 0) {
+      throw createError('Debe proporcionar al menos un dominio para crear', 400);
+    }
+
+    // Validar estructura de cada dominio
+    for (const domain of domains) {
+      if (!domain.name || !domain.description) {
+        throw createError('Cada dominio debe tener nombre y descripción', 400);
+      }
+    }
+
+    const createdDomains = await bianService.createDomains(domains);
+
+    res.status(201).json({
+      success: true,
+      data: createdDomains,
+      count: createdDomains.length,
+      message: `Se crearon ${createdDomains.length} dominios exitosamente`
+    });
+  })
+);
+
+/**
+ * @swagger
+ * /api/v1/bian/apis/create:
+ *   post:
+ *     summary: Crear APIs BIAN dinámicamente (sugeridas por IA)
+ *     tags: [BIAN]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - apis
+ *             properties:
+ *               apis:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     domain:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *     responses:
+ *       201:
+ *         description: APIs creadas exitosamente
+ */
+router.post('/apis/create',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { apis } = req.body;
+
+    if (!apis || !Array.isArray(apis) || apis.length === 0) {
+      throw createError('Debe proporcionar al menos una API para crear', 400);
+    }
+
+    // Validar estructura de cada API
+    for (const api of apis) {
+      if (!api.name || !api.domain || !api.description) {
+        throw createError('Cada API debe tener nombre, dominio y descripción', 400);
+      }
+    }
+
+    const createdApis = await bianService.createApis(apis);
+
+    res.status(201).json({
+      success: true,
+      data: createdApis,
+      count: createdApis.length,
+      message: `Se crearon ${createdApis.length} APIs exitosamente`
     });
   })
 );
