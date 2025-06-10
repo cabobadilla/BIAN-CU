@@ -490,6 +490,7 @@ const OverviewTab: React.FC<{ useCase: UseCase }> = ({ useCase }) => {
               </>
             )}
           </button>
+          {/* AI功能 - Funcionalidades IA disponibles en edición */}
           <button
             onClick={handleAnalyzeWithAI}
             disabled={isAnalyzingWithAI}
