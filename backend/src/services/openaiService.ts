@@ -17,8 +17,8 @@ class OpenAIService {
         throw new Error('OPENAI_API_KEY no está configurada correctamente');
       }
 
-      // Log para verificar que la key está configurada (sin mostrar la key completa por seguridad)
-      logger.info(`OpenAI API Key configurada: ${apiKey.length} caracteres, empieza con: ${apiKey.substring(0, 10)}...`);
+      // Verificar que la key está configurada
+      logger.info(`OpenAI API Key configurada correctamente`);
 
       this.openai = new OpenAI({
         apiKey: apiKey,
@@ -443,7 +443,7 @@ IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido, sin texto adicional an
         throw new Error('No se recibió respuesta de OpenAI');
       }
 
-      logger.info('Respuesta bruta de OpenAI para suggestUseCaseContent:', response);
+      logger.info('Procesando respuesta de OpenAI para contenido');
 
       // Función para extraer JSON válido de la respuesta
       const extractJSON = (text: string): string => {
@@ -624,7 +624,7 @@ IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido, sin explicaciones adic
   "confidence": 0.85
 }`;
 
-      logger.info('Prompt enviado a OpenAI:', prompt.substring(0, 300) + '...');
+      logger.info('Enviando solicitud a OpenAI...');
 
       const completion = await openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
@@ -644,7 +644,7 @@ IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido, sin explicaciones adic
 
       const response = completion.choices[0]?.message?.content;
       
-      logger.info('Respuesta completa de OpenAI:', response || 'RESPUESTA VACÍA');
+      logger.info('Respuesta recibida de OpenAI');
       
       if (!response || response.trim() === '') {
         logger.error('OpenAI devolvió respuesta vacía o nula');
@@ -652,7 +652,7 @@ IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido, sin explicaciones adic
         return this.generateBasicApiSuggestions(domains, useCaseContext);
       }
 
-      logger.info('Respuesta bruta de OpenAI para suggestApisByDomain:', response);
+      logger.info('Procesando respuesta de OpenAI para APIs');
 
       // Función para extraer JSON válido de la respuesta
       const extractJSON = (text: string): string => {
@@ -806,7 +806,7 @@ Estructura exacta:
 }`;
 
         try {
-          logger.info(`Enviando prompt para dominio ${domainData.domain}...`);
+          logger.info(`Procesando dominio ${domainData.domain}...`);
           
           const completion = await openai.chat.completions.create({
             model: 'gpt-3.5-turbo',
@@ -825,7 +825,7 @@ Estructura exacta:
           });
 
           const response = completion.choices[0]?.message?.content;
-          logger.info(`Respuesta OpenAI para ${domainData.domain}:`, response?.substring(0, 200) + '...');
+          logger.info(`Respuesta recibida para ${domainData.domain}`);
 
           if (response && response.trim() !== '') {
             const cleanedJSON = this.extractJSON(response);

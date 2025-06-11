@@ -65,43 +65,8 @@ router.get('/',
   })
 );
 
-/**
- * @swagger
- * /api/v1/use-cases/test-openai:
- *   get:
- *     summary: Probar conexión con OpenAI
- *     tags: [Use Cases]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Resultado del test de OpenAI
- */
-router.get('/test-openai',
-  asyncHandler(async (req: Request, res: Response) => {
-    try {
-      logger.info('Iniciando test de OpenAI desde endpoint...');
-      const testResult = await openaiService.testConnection();
-      
-      res.json({
-        success: true,
-        data: testResult,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error: any) {
-      logger.error('Error en test de OpenAI:', error);
-      
-      res.json({
-        success: false,
-        data: {
-          success: false,
-          error: error.message || 'Error desconocido'
-        },
-        timestamp: new Date().toISOString()
-      });
-    }
-  })
-);
+// Endpoint de test removido para producción
+// router.get('/test-openai', ...);
 
 /**
  * @swagger

@@ -19,28 +19,9 @@ api.interceptors.request.use(
     const authState = useAuthStore.getState();
     const token = authState.token;
     
-    // Debug logging
-    console.log('=== API INTERCEPTOR DEBUG ===');
-    console.log('Auth state:', {
-      isAuthenticated: authState.isAuthenticated,
-      tokenExists: !!token,
-      tokenStart: token ? token.substring(0, 20) + '...' : 'null',
-      userEmail: authState.user?.email || 'no user'
-    });
-    console.log('Request URL:', config.url);
-    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('✅ Using real JWT token');
-    } else {
-      console.error('❌ NO TOKEN AVAILABLE - Request will fail with 401');
-      // NO agregar token dummy - dejar que falle para debugging
     }
-    
-    const authHeader = config.headers.Authorization;
-    const headerDisplay = typeof authHeader === 'string' ? authHeader.substring(0, 30) + '...' : 'NONE';
-    console.log('Final Authorization header:', headerDisplay);
-    console.log('==============================');
     
     return config;
   },

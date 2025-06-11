@@ -6,16 +6,10 @@ import { Company } from '../models/Company';
 import { logger } from '../utils/logger';
 
 // Configuración de Google OAuth Strategy
-logger.info('=== PASSPORT CONFIGURATION DEBUG ===');
-logger.info(`GOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET'}`);
-logger.info(`GOOGLE_CLIENT_SECRET: ${process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET'}`);
-logger.info(`API_URL: ${process.env.API_URL || 'NOT SET'}`);
-logger.info(`NODE_ENV: ${process.env.NODE_ENV || 'NOT SET'}`);
-
 // Determinar callback URL
 const baseUrl = process.env.API_URL || 'https://bian-cu-backend.onrender.com';
 const callbackURL = `${baseUrl}/api/v1/auth/google/callback`;
-logger.info(`Callback URL configured: ${callbackURL}`);
+logger.info('Configuración OAuth inicializada');
 
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID!,
@@ -23,15 +17,10 @@ passport.use(new GoogleStrategy({
   callbackURL
 }, async (accessToken, refreshToken, profile, done) => {
   try {
-    logger.info('=== INICIO GOOGLE OAUTH STRATEGY ===');
-    logger.info(`Profile recibido: ${JSON.stringify(profile, null, 2)}`);
-    
     const email = profile.emails?.[0]?.value;
     const googleId = profile.id;
     const name = profile.displayName;
     const picture = profile.photos?.[0]?.value;
-
-    logger.info(`Datos extraídos - Email: ${email}, GoogleId: ${googleId}, Name: ${name}`);
 
     if (!email) {
       logger.error('No se pudo obtener email del perfil de Google');
@@ -39,11 +28,9 @@ passport.use(new GoogleStrategy({
     }
 
     // Buscar usuario existente
-    logger.info(`Buscando usuario existente por googleId: ${googleId}`);
     let user = await User.findOne({ googleId, isActive: true });
     
     if (user) {
-      logger.info(`Usuario encontrado por googleId: ${user.email}`);
       // Actualizar último login
       user.lastLogin = new Date();
       await user.save();
@@ -51,11 +38,9 @@ passport.use(new GoogleStrategy({
     }
 
     // Si no existe, buscar por email
-    logger.info(`Usuario no encontrado por googleId, buscando por email: ${email.toLowerCase()}`);
     user = await User.findOne({ email: email.toLowerCase(), isActive: true });
     
     if (user) {
-      logger.info(`Usuario encontrado por email: ${user.email}, vinculando cuenta de Google`);
       // Vincular cuenta de Google existente
       user.googleId = googleId;
       user.picture = picture;
@@ -64,11 +49,8 @@ passport.use(new GoogleStrategy({
       return done(null, user);
     }
 
-    logger.info('Usuario no encontrado, procediendo a crear nuevo usuario y empresa');
-
     // Determinar empresa basada en dominio del email
     const emailDomain = email.split('@')[1];
-    logger.info(`Buscando empresa para dominio: ${emailDomain}`);
     
     let company = await Company.findOne({ 
       $or: [
@@ -77,8 +59,6 @@ passport.use(new GoogleStrategy({
       ],
       isActive: true 
     });
-    
-    logger.info(`Empresa encontrada: ${company ? company.name : 'No encontrada'}`);
 
     if (!company) {
       // Crear empresa automáticamente para dominios no registrados
@@ -91,9 +71,8 @@ passport.use(new GoogleStrategy({
           features: ['use-cases', 'bian-analysis', 'api-generation']
         }
       });
-      const savedCompany = await company.save();
-      logger.info(`Nueva empresa creada automáticamente: ${company.name} con ID: ${company._id}`);
-      logger.info(`Empresa guardada, ID verificado: ${savedCompany._id}, tipo: ${typeof savedCompany._id}`);
+      await company.save();
+      logger.info(`Nueva empresa creada para dominio: ${emailDomain}`);
     }
 
     // Verificar que la empresa tiene un ID válido
@@ -102,8 +81,6 @@ passport.use(new GoogleStrategy({
     }
 
     // Crear nuevo usuario
-    logger.info(`Creando usuario con companyId: ${company._id}, tipo: ${typeof company._id}`);
-    
     user = new User({
       googleId,
       email,
@@ -114,9 +91,8 @@ passport.use(new GoogleStrategy({
       lastLogin: new Date()
     });
 
-    logger.info(`Usuario creado en memoria, validando...`);
     await user.save();
-    logger.info(`Nuevo usuario registrado: ${email} en empresa: ${company._id}`);
+    logger.info(`Nuevo usuario registrado: ${email}`);
     
     return done(null, user);
 

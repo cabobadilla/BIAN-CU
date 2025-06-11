@@ -2,62 +2,31 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
-console.log('=== MAIN SERVER START ===');
-console.log('Environment:', process.env.NODE_ENV);
-console.log('MongoDB URI configured:', !!process.env.MONGODB_URI);
-console.log('Google OAuth configured:', !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET);
-console.log('1. Starting imports...');
-
 import express from 'express';
-console.log('2. Express imported');
 import cors from 'cors';
-console.log('3. CORS imported');
 import helmet from 'helmet';
-console.log('4. Helmet imported');
 import rateLimit from 'express-rate-limit';
-console.log('5. Rate limit imported');
 import session from 'express-session';
-console.log('6. Session imported');
 import MongoStore from 'connect-mongo';
-console.log('7. MongoStore imported');
 import passport from 'passport';
-console.log('8. Passport imported');
 import swaggerJsdoc from 'swagger-jsdoc';
-console.log('9. Swagger JsDoc imported');
 import swaggerUi from 'swagger-ui-express';
-console.log('10. Swagger UI imported');
 
 import { connectDB } from './config/database';
-console.log('11. Database config imported');
 import { logger } from './utils/logger';
-console.log('12. Logger imported');
 import { initializeDefaultData } from './utils/initialization';
-console.log('13. Initialization imported');
 import { errorHandler } from './middleware/errorHandler';
-console.log('14. Error handler imported');
 import { authRoutes } from './routes/auth';
-console.log('15. Auth routes imported');
 import { companyRoutes } from './routes/companies';
-console.log('16. Company routes imported');
 import { useCaseRoutes } from './routes/useCases';
-console.log('17. Use case routes imported');
 import { bianRoutes } from './routes/bian';
-console.log('18. BIAN routes imported');
 import { schemaRoutes } from './routes/schemas';
-console.log('19. Schema routes imported');
 import { dataSourceRoutes } from './routes/dataSources';
-console.log('20. Data source routes imported');
 import { apiCustomizationRoutes } from './routes/apiCustomizations';
-console.log('21. API customization routes imported');
 import { singleApiRoutes } from './routes/singleApiRoutes';
-console.log('22. Single API routes imported');
-
-console.log('23. All imports completed successfully');
 
 const app = express();
-console.log('24. Express app created');
 const PORT = process.env.PORT || 3001;
-console.log('25. Port configured:', PORT);
 
 // Configuración de rate limiting
 const limiter = rateLimit({
@@ -65,24 +34,18 @@ const limiter = rateLimit({
   max: 100, // límite de 100 requests por ventana por IP
   message: 'Demasiadas solicitudes desde esta IP, intenta de nuevo más tarde.'
 });
-console.log('26. Rate limiter configured');
 
 // Middleware de seguridad
 app.use(helmet());
-console.log('27. Helmet middleware added');
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? process.env.FRONTEND_URL 
     : 'http://localhost:5173',
   credentials: true
 }));
-console.log('28. CORS middleware added');
 app.use(limiter);
-console.log('29. Rate limiter middleware added');
 app.use(express.json({ limit: '10mb' }));
-console.log('30. JSON middleware added');
 app.use(express.urlencoded({ extended: true }));
-console.log('31. URL encoded middleware added');
 
 // Configuración de sesiones
 const sessionConfig: any = {

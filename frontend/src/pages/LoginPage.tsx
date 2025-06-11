@@ -8,25 +8,7 @@ const LoginPage = () => {
 
   const handleGoogleLogin = () => {
     const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://bian-cu-backend.onrender.com';
-    
-    // Logging detallado para debugging
-    console.log('=== GOOGLE LOGIN DEBUG ===');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('Environment:', {
-      NODE_ENV: import.meta.env.MODE,
-      VITE_API_URL: import.meta.env.VITE_API_URL,
-      actual_API_BASE_URL: API_BASE_URL,
-      window_location: window.location.href,
-      window_origin: window.location.origin
-    });
-    
     const authUrl = `${API_BASE_URL}/api/v1/auth/google`;
-    console.log('Auth URL construida:', authUrl);
-    console.log('Redirecting to:', authUrl);
-    
-    // Log antes de la redirección
-    console.log('About to redirect...');
-    
     window.location.href = authUrl;
   };
 
@@ -46,23 +28,7 @@ const LoginPage = () => {
   };
 
   useEffect(() => {
-    // Logging detallado para debugging
-    console.log('=== LOGIN PAGE LOAD DEBUG ===');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('Current URL:', window.location.href);
-    console.log('Search params:', {
-      error: searchParams.get('error'),
-      all_params: Object.fromEntries(searchParams.entries())
-    });
-    console.log('Referrer:', document.referrer);
-    
-    if (error) {
-      console.log('ERROR DETECTED:', error);
-      console.log('Error message:', getErrorMessage(error));
-    }
-    
-    // Limpiar cualquier estado de autenticación previo
-    // (esto se podría hacer en el store si fuera necesario)
+    // Limpiar cualquier estado de autenticación previo si es necesario
   }, []);
 
   return (
